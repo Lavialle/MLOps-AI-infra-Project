@@ -4,7 +4,7 @@
     MODEL_URI=models:/ride-classifier@staging uvicorn ride_classifier.api.main:app   # straight from the Registry
 
 Endpoints: POST /predict (JSON ride), POST /predict/file (parquet/CSV, one or more rides),
-POST /feedback, GET /health, GET /metrics (Prometheus). Swagger UI: /docs.
+POST /feedback, GET /health (liveness), GET /ready (readiness), GET /metrics (Prometheus). Swagger UI: /docs.
 
 The model is the MLflow pyfunc logged by ride_classifier.train: it takes RAW IMU rows
 and does gap filling, scaling, windowing and per-ride aggregation itself.
@@ -152,6 +152,15 @@ def predict_rides(df: pd.DataFrame) -> list[RidePrediction]:
 def health() -> Health:
     loaded = state["model"] is not None
     return Health(status="ok" if loaded else "degraded", model_loaded=loaded, model_version=state["version"])
+
+
+@app.get("/ready", summary="Readiness probe: 503 until the model is loaded")
+def ready() -> dict:
+    """Kubernetes readinessProbe. /health stays 200 when degraded (liveness: restarting would not help),
+    /ready returns 503 so that a pod without a model never receives traffic."""
+    if state["model"] is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return {"ready": True}
 
 
 @app.post("/predict", response_model=RidePrediction, summary="Classify one ride sent as JSON")

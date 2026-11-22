@@ -1,0 +1,64 @@
+# MLflow tracking server + Model Registry (same image and flags as docker compose).
+# Exposed on http://localhost:5050 through NodePort 30050 (k8s/kind-config.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  labels: {app: mlflow}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: mlflow}
+  template:
+    metadata:
+      labels: {app: mlflow}
+    spec:
+      containers:
+        - name: mlflow
+          image: ride-classifier-mlflow # built from docker/mlflow, loaded with `kind load` (make kind-load)
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - >-
+              mlflow server --host 0.0.0.0 --port 5000 --workers 1
+              --backend-store-uri postgresql+psycopg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB
+              --artifacts-destination s3://$MLFLOW_BUCKET
+              --serve-artifacts
+              --allowed-hosts "localhost,localhost:*,127.0.0.1:*,mlflow,mlflow:*,mlflow.ride-classifier:*"
+          envFrom:
+            - secretRef: {name: ride-classifier-secrets}
+            - configMapRef: {name: ride-classifier-config}
+          env:
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: http://s3:8333
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: MLFLOW_DISABLE_AGENT_HINT
+              value: "1"
+            - name: MLFLOW_SERVER_ENABLE_JOB_EXECUTION # no GenAI job queue: 2.3 GB -> 450 MB
+              value: "false"
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 384Mi}
+            limits: {cpu: "1", memory: 1Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+spec:
+  type: NodePort
+  selector: {app: mlflow}
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30050

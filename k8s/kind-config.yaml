@@ -1,0 +1,20 @@
+# kind create cluster --name ride-classifier --config k8s/kind-config.yaml   (make kind-up)
+#
+# NodePorts exposed on the host (different from the docker compose dev ports, both can coexist):
+#   API      http://localhost:8080   (Swagger: /docs)
+#   Web app  http://localhost:8081
+#   MLflow   http://localhost:5050
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080 # NodePort of Service ride-classifier-api
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 30081 # NodePort of Service ride-classifier-webapp
+        hostPort: 8081
+        protocol: TCP
+      - containerPort: 30050 # NodePort of Service mlflow
+        hostPort: 5050
+        protocol: TCP

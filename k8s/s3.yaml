@@ -1,0 +1,90 @@
+# S3 storage (SeaweedFS, as in docker compose): MLflow artifacts + DVC remote.
+# One replica with a PersistentVolumeClaim: data survives pod restarts.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: s3-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3
+  labels: {app: s3}
+spec:
+  replicas: 1
+  strategy: {type: Recreate} # RWO volume: never two pods at once
+  selector:
+    matchLabels: {app: s3}
+  template:
+    metadata:
+      labels: {app: s3}
+    spec:
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:4.54
+          args: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-volume.max=20"]
+          ports:
+            - containerPort: 8333
+          readinessProbe:
+            tcpSocket: {port: 8333}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: s3-config, mountPath: /etc/seaweedfs, readOnly: true}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: s3-data}
+        - name: s3-config
+          secret: {secretName: s3-config}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3
+spec:
+  selector: {app: s3}
+  ports:
+    - port: 8333
+      targetPort: 8333
+---
+# Creates buckets "mlflow" & "dvc" (idempotent), like s3-init in docker compose
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-init
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-buckets
+          image: ride-classifier-mlflow # boto3 is in the MLflow server image
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: {name: ride-classifier-secrets}
+            - configMapRef: {name: ride-classifier-config}
+          command:
+            - python
+            - -c
+            - |
+              import os, boto3
+              s3 = boto3.client("s3", endpoint_url=os.environ["S3_ENDPOINT_URL"])
+              existing = {b["Name"] for b in s3.list_buckets().get("Buckets", [])}
+              for bucket in (os.environ["MLFLOW_BUCKET"], os.environ["DVC_BUCKET"]):
+                  if bucket not in existing:
+                      s3.create_bucket(Bucket=bucket)
+                  print(f"bucket {bucket}: ok")
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}

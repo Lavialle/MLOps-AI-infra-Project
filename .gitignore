@@ -26,3 +26,6 @@ reports/*.png
 # IDE
 .idea/
 .vscode/
+
+# Kubernetes credentials (generated from k8s/secrets.example)
+k8s/secrets/

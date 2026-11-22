@@ -1,0 +1,47 @@
+# Streamlit web app: talks to the API through its Service (cluster DNS), never to the model.
+# Exposed on http://localhost:8081 through NodePort 30081 (k8s/kind-config.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ride-classifier-webapp
+  labels: {app: ride-classifier-webapp}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ride-classifier-webapp}
+  template:
+    metadata:
+      labels: {app: ride-classifier-webapp}
+    spec:
+      containers:
+        - name: webapp
+          image: nicogil7/ride-classifier-webapp
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: API_URL
+              value: http://ride-classifier-api # Service name, port 80
+          ports:
+            - containerPort: 8501
+          readinessProbe:
+            httpGet: {path: /_stcore/health, port: 8501}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /_stcore/health, port: 8501}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources: # measured ~140 MiB
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ride-classifier-webapp
+spec:
+  type: NodePort
+  selector: {app: ride-classifier-webapp}
+  ports:
+    - port: 80
+      targetPort: 8501
+      nodePort: 30081

@@ -29,6 +29,10 @@ def client(model_dir, tmp_path, monkeypatch):
 
 
 # --- health & docs ---------------------------------------------------------------
+def test_ready_when_model_loaded(client):
+    assert client.get("/ready").status_code == 200
+
+
 def test_health_exposes_model_version(client):
     body = client.get("/health").json()
     assert body == {"status": "ok", "model_loaded": True, "model_version": "test"}
@@ -41,6 +45,7 @@ def test_health_is_degraded_without_model(tmp_path, monkeypatch):
     importlib.reload(main)
     with TestClient(main.app) as c:
         assert c.get("/health").json()["status"] == "degraded"
+        assert c.get("/ready").status_code == 503
         assert c.post("/predict", json=ride_payload()).status_code == 503
 
 
