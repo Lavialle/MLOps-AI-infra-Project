@@ -30,13 +30,13 @@ from torch.utils.data import DataLoader, TensorDataset
 from ride_classifier.config import CLASSES, MODEL_NAME, RIDE_ID, ROOT, TARGET, load_params
 from ride_classifier.features import ChannelScaler, aggregate_by_ride, make_windows
 from ride_classifier.model import (
-    INPUT_COLUMNS,
     RideClassifier,
     build_net,
     confusion,
     majority_baseline,
     predict_windows,
     ride_scores,
+    synthetic_ride,
 )
 
 REPORTS = ROOT / "reports"
@@ -151,7 +151,8 @@ def main() -> None:
         mlflow.log_dict(confusion(val, val_pred), "val_confusion_matrix.json")
         mlflow.log_dict(model.scaler, "channel_scaler.json")
 
-        sample = val[val[RIDE_ID] == val[RIDE_ID].iloc[0]][INPUT_COLUMNS].head(300)
+        # Synthetic example: the input example is published with the model (registry, Docker image), real rides are not
+        sample = synthetic_ride()
         with tempfile.TemporaryDirectory() as tmp:
             weights = Path(tmp) / "weights.pt"
             torch.save(model.net.state_dict(), weights)

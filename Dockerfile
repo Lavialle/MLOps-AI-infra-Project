@@ -26,7 +26,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY README.md params.yaml ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-default-groups --no-editable
+    uv sync --locked --no-default-groups --no-editable \
+    && rm -rf build src/*.egg-info
 
 COPY model ./model
 
