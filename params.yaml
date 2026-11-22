@@ -1,0 +1,25 @@
+# Parameters tracked by DVC (dvc.yaml) and logged to MLflow.
+data:
+  raw_rides_path: data/raw/GBG500.parquet        # versioned with `dvc add`
+  raw_labels_path: data/raw/GBG500_labels.csv    # versioned with `dvc add`
+  test_share: 0.15                               # stratified split BY RIDE, see ride_classifier/data.py
+  val_share: 0.15
+  random_state: 42
+  train_path: data/processed/train.parquet
+  val_path: data/processed/val.parquet
+  test_path: data/processed/test.parquet         # frozen set used by the evaluation gate
+
+features:
+  window_size: 256      # samples per window (25.6 s at 10 Hz)
+  window_stride: 128
+
+train:
+  model: cnn1d
+  epochs: 30
+  batch_size: 64
+  learning_rate: 0.001
+  class_weighting: balanced   # 416 Safe vs 6 Reckless: weight the loss by inverse class frequency
+  random_state: 42
+
+gate:
+  min_macro_f1: 0.30    # must beat the majority-class baseline (macro F1 ~ 0.18). Calibrate after the first run.
