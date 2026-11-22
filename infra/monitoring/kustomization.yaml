@@ -1,0 +1,22 @@
+# Monitoring module, included by k8s/kustomization.yaml (which sets the namespace).
+# The config files are the SAME as the docker compose dev stack: one source of truth.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - k8s.yaml
+
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml=prometheus/prometheus-k8s.yml
+      - alerts.yml=prometheus/alerts.yml
+  - name: grafana-datasources
+    files:
+      - grafana/provisioning/datasources/prometheus.yml
+  - name: grafana-dashboard-providers
+    files:
+      - grafana/provisioning/dashboards/dashboards.yml
+  - name: grafana-dashboards
+    files:
+      - grafana/dashboards/ride-classifier.json

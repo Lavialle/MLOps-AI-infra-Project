@@ -4,8 +4,9 @@
 # URLs : MLflow http://localhost:5000 · S3 API http://localhost:8333 (no web page)
 #        S3 file browser http://localhost:8888/buckets/ · SeaweedFS status http://localhost:9333
 #        API http://localhost:8000/docs · Web app http://localhost:8501
+#        Prometheus http://localhost:9090 · Grafana http://localhost:3000 (admin / admin)
 #
-# Prometheus/Grafana (step 9) are added later.
+# Monitoring only (no S3, no MLflow needed): docker compose up -d prometheus grafana   (make monitoring)
 
 name: ride-classifier
 
@@ -110,6 +111,42 @@ services:
       - api
     restart: unless-stopped
 
+  # Monitoring: same config files as the Kubernetes prod (infra/monitoring/)
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/monitoring/prometheus/prometheus-compose.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prom-data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # to scrape an API started on the host (make api)
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.0.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/ride-classifier.json
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   s3-data:
   pg-data:
+  prom-data:
+  grafana-data:

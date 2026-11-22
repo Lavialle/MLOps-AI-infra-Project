@@ -130,3 +130,25 @@ def test_aggregate_by_ride_returns_probabilities():
     assert list(out.columns) == CLASSES
     assert out.loc["a", "Safe"] == 0.5 and out.loc["b", "Reckless"] == 1.0
     np.testing.assert_allclose(out.sum(axis=1), 1)
+
+
+# --- incident simulation (monitoring) ---------------------------------------------
+def test_unit_bug_divides_accelerometer_by_g_only():
+    from ride_classifier.simulate import G, apply_incident
+
+    rides, _ = make_fake_rides(1, seed=0)
+    ride = rides[rides[RIDE_ID] == rides[RIDE_ID].iloc[0]]
+    out = apply_incident(ride, unit_bug=True, dropouts=0.0, rng=np.random.default_rng(0))
+    np.testing.assert_allclose(out["ay"].dropna(), ride["ay"].dropna() / G)
+    pd.testing.assert_series_equal(out["rx"], ride["rx"])
+
+
+def test_dropouts_blank_whole_samples():
+    from ride_classifier.simulate import apply_incident
+
+    rides, _ = make_fake_rides(1, seed=0)
+    ride = rides[rides[RIDE_ID] == rides[RIDE_ID].iloc[0]].fillna(0.0)
+    out = apply_incident(ride, unit_bug=False, dropouts=0.3, rng=np.random.default_rng(0))
+    missing = out[CHANNELS].isna()
+    assert 0.2 < missing.any(axis=1).mean() < 0.4
+    assert (missing.all(axis=1) == missing.any(axis=1)).all()  # all 6 channels at once, like real dropouts

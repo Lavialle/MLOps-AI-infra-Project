@@ -4,6 +4,8 @@
 #   API      http://localhost:8080   (Swagger: /docs)
 #   Web app  http://localhost:8081
 #   MLflow   http://localhost:5050
+#   Grafana  http://localhost:3030, Prometheus http://localhost:9091 (clusters created after step 9;
+#            on an older cluster use `make monitoring-forward`)
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -17,4 +19,10 @@ nodes:
         protocol: TCP
       - containerPort: 30050 # NodePort of Service mlflow
         hostPort: 5050
+        protocol: TCP
+      - containerPort: 30030 # NodePort of Service grafana
+        hostPort: 3030
+        protocol: TCP
+      - containerPort: 30090 # NodePort of Service prometheus
+        hostPort: 9091
         protocol: TCP
