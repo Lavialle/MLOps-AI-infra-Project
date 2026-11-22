@@ -124,7 +124,18 @@ scores vary a lot between epochs and splits. The next improvement would be cross
 
 ## Docker images
 
-*(To come: Docker Hub URLs.)*
+| Image | Docker Hub |
+|-------|-----------|
+| API (model baked in) | [`nicogil7/ride-classifier-api`](https://hub.docker.com/r/nicogil7/ride-classifier-api) |
+| Web app | [`nicogil7/ride-classifier-webapp`](https://hub.docker.com/r/nicogil7/ride-classifier-webapp) |
+
+```bash
+docker run -p 8000:8000 nicogil7/ride-classifier-api:latest                       # http://localhost:8000/docs
+docker run -p 8501:8501 -e API_URL=http://host.docker.internal:8000 nicogil7/ride-classifier-webapp:latest
+```
+
+`make image image-webapp` builds them, `make app` runs both with docker compose, and `make push` publishes them.
+See [docs/docker.md](docs/docker.md).
 
 ## Contributing
 

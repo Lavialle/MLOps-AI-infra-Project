@@ -28,6 +28,18 @@ from ride_classifier.features import ChannelScaler, aggregate_by_ride, make_wind
 INPUT_COLUMNS = [RIDE_ID, TIME, *CHANNELS]
 
 
+def synthetic_ride(n: int = 300, seed: int = 0) -> pd.DataFrame:
+    """A fake ride with the real schema (gravity on ay, small noise). Used as the MLflow input example,
+    which is published with the model: it must never contain real course data."""
+    rng = np.random.default_rng(seed)
+    values = rng.normal(0, [0.3, 0.3, 0.3, 2.0, 5.0, 2.0], (n, len(CHANNELS))).round(4)
+    values[:, 1] -= 9.4
+    ride = pd.DataFrame(values, columns=CHANNELS)
+    ride.insert(0, TIME, np.arange(n, dtype="int64") * 100)
+    ride.insert(0, RIDE_ID, "synthetic-ride")
+    return ride
+
+
 def build_net(dropout: float = 0.3) -> nn.Module:
     """Small 1D-CNN: (batch, 6, window) -> (batch, 5) logits. Global average pooling makes it window-size agnostic."""
 
