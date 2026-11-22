@@ -1,0 +1,42 @@
+schema: '2.0'
+stages:
+  split:
+    cmd: python -m ride_classifier.data
+    deps:
+    - path: data/raw/GBG500.parquet
+      hash: md5
+      md5: f7eb702062e890c9f3c533e5eaa683b7
+      size: 30206760
+    - path: data/raw/GBG500_labels.csv
+      hash: md5
+      md5: 843abe6d85802a850c945519678d2232
+      size: 35532
+    - path: src/ride_classifier/data.py
+      hash: md5
+      md5: b4046edc74c3ac8b1180c442459acf01
+      size: 5028
+    params:
+      params.yaml:
+        data:
+          raw_rides_path: data/raw/GBG500.parquet
+          raw_labels_path: data/raw/GBG500_labels.csv
+          max_missing_share: 0.05
+          test_share: 0.15
+          val_share: 0.15
+          random_state: 42
+          train_path: data/processed/train.parquet
+          val_path: data/processed/val.parquet
+          test_path: data/processed/test.parquet
+    outs:
+    - path: data/processed/test.parquet
+      hash: md5
+      md5: 9281f19ed13aa17fca937e51f8f3b1c4
+      size: 5317271
+    - path: data/processed/train.parquet
+      hash: md5
+      md5: 90814d177204906f5e52bc233a3c0c24
+      size: 21359222
+    - path: data/processed/val.parquet
+      hash: md5
+      md5: d29fb4062189e279a4cbfb36bc9f1d9a
+      size: 5283183

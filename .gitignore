@@ -7,11 +7,6 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 
-# Data: versioned with DVC (data/raw/*.dvc are committed), never with git
-/data/raw/*
-!/data/raw/*.dvc
-/data/processed/
-
 # MLflow local
 mlruns/
 mlflow.db

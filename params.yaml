@@ -2,7 +2,8 @@
 data:
   raw_rides_path: data/raw/GBG500.parquet        # versioned with `dvc add`
   raw_labels_path: data/raw/GBG500_labels.csv    # versioned with `dvc add`
-  test_share: 0.15                               # stratified split BY RIDE, see ride_classifier/data.py
+  max_missing_share: 0.05                        # sensor dropouts: interpolated if below, ride rejected above
+  test_share: 0.15                              # stratified split BY RIDE, see ride_classifier/data.py
   val_share: 0.15
   random_state: 42
   train_path: data/processed/train.parquet

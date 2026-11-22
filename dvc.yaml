@@ -1,0 +1,19 @@
+# Reproducible pipeline:  dvc repro  then  dvc push
+# DVC only reruns the stages whose dependencies or parameters changed.
+#
+# The raw files are NOT produced by a stage: they are versioned with
+# `dvc add data/raw/GBG500.parquet data/raw/GBG500_labels.csv` (`dvc pull` to get them).
+# Stages train and evaluate are added in step 2.
+stages:
+  split:
+    cmd: python -m ride_classifier.data
+    deps:
+      - src/ride_classifier/data.py
+      - data/raw/GBG500.parquet
+      - data/raw/GBG500_labels.csv
+    params:
+      - data
+    outs:
+      - data/processed/train.parquet
+      - data/processed/val.parquet
+      - data/processed/test.parquet
