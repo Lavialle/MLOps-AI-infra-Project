@@ -3,7 +3,7 @@
 #
 # The raw files are NOT produced by a stage: they are versioned with
 # `dvc add data/raw/GBG500.parquet data/raw/GBG500_labels.csv` (`dvc pull` to get them).
-# Stages train and evaluate are added in step 2.
+# train and evaluate need the MLflow server (make up) and MLFLOW_TRACKING_URI (make loads .env).
 stages:
   split:
     cmd: python -m ride_classifier.data
@@ -17,3 +17,30 @@ stages:
       - data/processed/train.parquet
       - data/processed/val.parquet
       - data/processed/test.parquet
+
+  train:
+    cmd: python -m ride_classifier.train
+    deps:
+      - src/ride_classifier/train.py
+      - src/ride_classifier/model.py
+      - src/ride_classifier/features.py
+      - data/processed/train.parquet
+      - data/processed/val.parquet
+    params:
+      - features
+      - train
+    metrics:
+      - reports/train.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m ride_classifier.evaluate
+    deps:
+      - src/ride_classifier/evaluate.py
+      - reports/train.json
+      - data/processed/test.parquet
+    params:
+      - gate
+    metrics:
+      - reports/eval.json:
+          cache: false

@@ -40,3 +40,69 @@ stages:
       hash: md5
       md5: d29fb4062189e279a4cbfb36bc9f1d9a
       size: 5283183
+  train:
+    cmd: python -m ride_classifier.train
+    deps:
+    - path: data/processed/train.parquet
+      hash: md5
+      md5: 90814d177204906f5e52bc233a3c0c24
+      size: 21359222
+    - path: data/processed/val.parquet
+      hash: md5
+      md5: d29fb4062189e279a4cbfb36bc9f1d9a
+      size: 5283183
+    - path: src/ride_classifier/features.py
+      hash: md5
+      md5: 2297126a8f3571bcc45f16ce583312c5
+      size: 3410
+    - path: src/ride_classifier/model.py
+      hash: md5
+      md5: e1450668832b97907b4ad5afe783b215
+      size: 5294
+    - path: src/ride_classifier/train.py
+      hash: md5
+      md5: 650e19f810974b3ba9fa90772ebd9aae
+      size: 6542
+    params:
+      params.yaml:
+        features:
+          window_size: 256
+          window_stride: 128
+        train:
+          model: cnn1d
+          epochs: 30
+          batch_size: 64
+          learning_rate: 0.001
+          dropout: 0.3
+          class_weighting: balanced
+          patience: 8
+          random_state: 42
+    outs:
+    - path: reports/train.json
+      hash: md5
+      md5: 39a9780d952a957171873e0a0709c196
+      size: 793
+  evaluate:
+    cmd: python -m ride_classifier.evaluate
+    deps:
+    - path: data/processed/test.parquet
+      hash: md5
+      md5: 9281f19ed13aa17fca937e51f8f3b1c4
+      size: 5317271
+    - path: reports/train.json
+      hash: md5
+      md5: 39a9780d952a957171873e0a0709c196
+      size: 793
+    - path: src/ride_classifier/evaluate.py
+      hash: md5
+      md5: 5ea8f5d58659ae3a1c27aa43c0d9ed78
+      size: 2835
+    params:
+      params.yaml:
+        gate:
+          min_macro_f1: 0.3
+    outs:
+    - path: reports/eval.json
+      hash: md5
+      md5: a65cedeed3bedcab4c7b88e4856f1b18
+      size: 773

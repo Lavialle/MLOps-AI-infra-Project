@@ -5,12 +5,15 @@ small fake file with the SAME schema (ride_id, time_index, ax..rz + RIDE_ID, LAB
 and an easy class signal (each class shakes the accelerometer at a different amplitude).
 """
 
+import mlflow
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 from ride_classifier.config import CHANNELS, CLASSES
 from ride_classifier.data import load_raw
+from ride_classifier.train import fit
 
 RIDES_PER_CLASS = 6
 
@@ -45,3 +48,36 @@ def raw_files(tmp_path_factory):
 @pytest.fixture(scope="session")
 def small_data(raw_files) -> pd.DataFrame:
     return load_raw(*raw_files)
+
+
+# Small and fast: fake rides are 300-600 samples long
+FEAT_PARAMS = {"window_size": 128, "window_stride": 64}
+TRAIN_PARAMS = {
+    "epochs": 15,
+    "batch_size": 32,
+    "learning_rate": 0.003,
+    "dropout": 0.1,
+    "class_weighting": "balanced",
+    "patience": 15,
+    "random_state": 0,
+}
+
+
+@pytest.fixture(scope="session")
+def trained(small_data):
+    """(RideClassifier, best val scores) trained on fake rides, validated on other fake rides."""
+    val_rides, val_labels = make_fake_rides(3, seed=2)
+    val = val_rides.merge(val_labels.rename(columns={"RIDE_ID": "ride_id", "LABEL": "label"}), on="ride_id")
+    return fit(small_data, val.fillna(0.0), FEAT_PARAMS, TRAIN_PARAMS)
+
+
+@pytest.fixture(scope="session")
+def model_dir(tmp_path_factory, trained):
+    """The trained wrapper saved as an MLflow pyfunc model, as train.py logs it (no server needed)."""
+    model, _ = trained
+    folder = tmp_path_factory.mktemp("model")
+    weights = folder / "weights.pt"
+    torch.save(model.net.state_dict(), weights)
+    path = folder / "model"
+    mlflow.pyfunc.save_model(str(path), python_model=model, artifacts={"weights": str(weights)})
+    return path
