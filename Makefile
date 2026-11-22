@@ -34,6 +34,9 @@ evaluate: ## Gate macro F1 on the test split, promote to @staging if OK
 pipeline: ## Pipeline DVC (split -> train -> evaluate)
 	uv run dvc repro
 
+dag: ## Prints the pipeline DAG (dvc.yaml)
+	uv run dvc dag
+
 export: ## Downloads model @staging in ./model
 	uv run python -m ride_classifier.export_model
 
@@ -44,4 +47,4 @@ lint: ## Ruff
 test: ## Tests
 	uv run pytest -q
 
-.PHONY: help setup up down pull data train evaluate pipeline export lint test
+.PHONY: help setup up down pull data train evaluate pipeline dag export lint test
