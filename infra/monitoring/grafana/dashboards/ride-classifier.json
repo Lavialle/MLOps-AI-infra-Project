@@ -639,7 +639,7 @@
       "type": "timeseries",
       "title": "Share of rides per predicted class",
       "id": 11,
-      "description": "Baseline on the test split: 69 % Safe, 17 % Bad weather, 5 % Reckless (alert PredictedRecklessShareHigh above 15 %).",
+      "description": "Baseline on the test split: 69 % Safe, 17 % Bad weather, 5 % Reckless (alert RecklessShareHigh above 15 %).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -767,7 +767,7 @@
       "type": "timeseries",
       "title": "Median confidence (probability of the predicted class)",
       "id": 12,
-      "description": "Baseline 0.54. A drop means inputs unlike the training data (alert PredictionConfidenceLow below 0.4).",
+      "description": "Baseline 0.54. A drop means inputs unlike the training data (alert ConfidenceLow below 0.4).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

@@ -1,10 +1,16 @@
 # Ride Classifier: MLOps & AI Infrastructure Project
 
-End-to-end MLOps pipeline that classifies bike rides into five categories:
-**Safe**, **Safe overall**, **Bad weather**, **Tandem** and **Reckless**.
-The input is each ride's IMU time series (accelerometer `ax, ay, az` and gyroscope `rx, ry, rz`, sampled at 10 Hz).
+[![CI](https://github.com/ngilhodes-netizen/MLOps-AI-infra-Project/actions/workflows/ci.yml/badge.svg)](https://github.com/ngilhodes-netizen/MLOps-AI-infra-Project/actions/workflows/ci.yml)
+[![CD](https://github.com/ngilhodes-netizen/MLOps-AI-infra-Project/actions/workflows/cd.yml/badge.svg)](https://github.com/ngilhodes-netizen/MLOps-AI-infra-Project/actions/workflows/cd.yml)
 
-> Albert School: MLOps & Model Deployment. Status: 🚧 work in progress.
+End-to-end MLOps pipeline that classifies a bike ride into **Safe**, **Safe overall**, **Bad weather**, **Tandem**
+or **Reckless** from its IMU time series (accelerometer `ax, ay, az`, gyroscope `rx, ry, rz`, 10 Hz).
+
+It covers versioned data, a deep learning model tracked in MLflow, an evaluation gate, a FastAPI service and a
+Streamlit app, Docker images on Docker Hub, a Kubernetes production environment, and CI/CD with automatic
+deployment and retraining. Monitoring runs on Prometheus and Grafana.
+
+> Albert School · MLOps & Model Deployment · final project
 
 ## Team
 
@@ -16,120 +22,144 @@ The input is each ride's IMU time series (accelerometer `ax, ay, az` and gyrosco
 | TBD  | Docker & Kubernetes |
 | TBD  | CI/CD & monitoring |
 
+## What the brief asks, and where it is
+
+| Requirement | Where |
+|-------------|-------|
+| 1. Extract the data | Raw files versioned with **DVC** on the S3 remote, validated and split by ride: [`data.py`](src/ride_classifier/data.py), [docs/data.md](docs/data.md) |
+| 2. Deep learning classifier (5 classes) | **PyTorch 1D-CNN** on IMU windows: [`model.py`](src/ride_classifier/model.py), [`train.py`](src/ride_classifier/train.py), [docs/model.md](docs/model.md) |
+| 3. Model stored on S3 | MLflow artifact store on the S3 bucket `mlflow` (SeaweedFS, see *Technical choices*) |
+| 4. MLflow tracking and versioning | Params, per-epoch metrics, confusion matrices, model registry, evaluation gate, `@staging` alias |
+| 5. API | **FastAPI** + Swagger: JSON ride or parquet/CSV upload, validation, metrics: [docs/api.md](docs/api.md) |
+| Interactive web app | **Streamlit**, calls the API only: [`webapp/app.py`](webapp/app.py) |
+| 6. Docker + Kubernetes via GitHub Actions (self-hosted runner) | Images on Docker Hub, local **kind** cluster, `cd.yml` on a self-hosted runner: [docs/docker.md](docs/docker.md), [docs/kubernetes.md](docs/kubernetes.md), [docs/cicd.md](docs/cicd.md) |
+| 7. Versioned and documented on GitHub | One PR per step, CI on every PR, `docs/` |
+| Pipeline DAG | **DVC** pipeline `split → train → evaluate`: [`dvc.yaml`](dvc.yaml), [docs/pipeline.md](docs/pipeline.md) |
+| Tests | 62 unit + integration tests (CI) and 5 end-to-end tests run against prod after each deployment: [`tests/`](tests/) |
+| **Bonus 1** Retraining pipeline | [`retrain.yml`](.github/workflows/retrain.yml): DVC pull → train → gate → promote → redeploy |
+| **Bonus 2** Monitoring | **Prometheus + Grafana**, 4-layer dashboard, 8 alerts with runbooks: [docs/monitoring.md](docs/monitoring.md) |
+
 ## Architecture
 
-*(Diagram to come.)*
+```mermaid
+flowchart LR
+    subgraph gh["GitHub"]
+        ci["CI: lint + tests<br/>(GitHub-hosted)"]
+        cd["CD + Retrain<br/>(self-hosted runner)"]
+    end
+    hub[("Docker Hub<br/>nicogil7/ride-classifier-*")]
 
-| Component | Dev (`make up`, `make app`) | Prod (kind cluster, `make k8s-deploy`) |
-|-----------|----------------------|-------------------|
-| Object storage (S3) | SeaweedFS | SeaweedFS + PVC |
-| Data versioning & pipeline | DVC (S3 remote) | – |
-| Experiment tracking & registry | MLflow + Postgres, http://localhost:5000 | MLflow + Postgres (PVC), http://localhost:5050 |
-| Prediction API | FastAPI, http://localhost:8000 | 2 replicas, http://localhost:8080 |
-| Web app | Streamlit, http://localhost:8501 | http://localhost:8081 |
-| Monitoring | Prometheus :9090 + Grafana :3000 | Prometheus (pod discovery) + Grafana, http://localhost:3030 |
+    subgraph k8s["Prod: kind cluster · namespace ride-classifier"]
+        s3[("S3 (SeaweedFS)<br/>buckets dvc, mlflow")]
+        pg[("Postgres")]
+        mlflow["MLflow<br/>tracking + registry"]
+        api["API ×2<br/>FastAPI, model baked in"]
+        web["Web app<br/>Streamlit"]
+        prom["Prometheus"]
+        graf["Grafana"]
+    end
 
-See [docs/kubernetes.md](docs/kubernetes.md) for the production environment.
+    user(("User")) --> web --> api
+    user -->|Swagger / curl| api
+    mlflow --> pg
+    mlflow --> s3
+    prom -->|scrape /metrics<br/>pod discovery| api
+    graf --> prom
 
-**Why SeaweedFS and not MinIO.** The brief asks for "AWS S3 (Minio)". MinIO no longer publishes its Docker images:
-`minio/minio` is gone from Docker Hub and `quay.io/minio/minio` refuses anonymous pulls. We therefore use SeaweedFS,
-the S3-compatible store used in the course labs. All code talks to it through the standard S3 API (boto3, DVC, MLflow),
-so switching to MinIO or AWS S3 only means changing the endpoint and credentials.
-
-## Repository layout
-
+    cd -->|"dvc pull, train, gate"| mlflow
+    cd -->|"export @staging, build, push"| hub
+    cd -->|"kind load, rolling update, e2e tests"| api
+    ci -.->|merge to main| cd
 ```
-src/ride_classifier/   # one module per pipeline step (python -m ride_classifier.<step>), api/
-webapp/                # Streamlit app for testing the model
-params.yaml            # parameters (tracked by DVC, logged to MLflow)
-docker/                # Dockerfiles of the services (MLflow server)
-infra/                 # service configs (S3, Prometheus, Grafana)
-k8s/                   # Kubernetes manifests (prod)
-tests/                 # tests
-docs/                  # extra documentation
-.github/workflows/     # CI/CD
-```
 
-## Quickstart (dev)
+The training pipeline is a DVC DAG: `raw data (DVC) → split (by ride) → train (MLflow run + new version) →
+evaluation gate (test split) → @staging → export → API image`.
 
-Prerequisites: [uv](https://docs.astral.sh/uv/) and Docker Desktop.
+| Component | Dev (docker compose) | Prod (kind) |
+|-----------|----------------------|-------------|
+| S3 storage | SeaweedFS :8333 | SeaweedFS + PVC |
+| Tracking + registry | MLflow + Postgres, http://localhost:5000 | MLflow + Postgres (PVC), http://localhost:5050 |
+| API | http://localhost:8000/docs | 2 replicas, http://localhost:8080/docs |
+| Web app | http://localhost:8501 | http://localhost:8081 |
+| Monitoring | Prometheus :9090, Grafana :3000 | Prometheus (pod discovery), Grafana :3030 |
+
+## Quickstart
+
+Prerequisites: [uv](https://docs.astral.sh/uv/), Docker Desktop, [kind](https://kind.sigs.k8s.io/) (prod only).
+`make help` lists every command.
+
+**Dev**
 
 ```bash
-make setup     # Python env (3.14) + .env
-make up        # S3 (SeaweedFS), Postgres, MLflow
-make test
+make setup                 # Python 3.14 env (uv) + .env
+make up                    # S3, Postgres, MLflow, Prometheus, Grafana
+make pull                  # dvc pull: raw data from S3
+make pipeline              # dvc repro: split -> train -> evaluate (promotes @staging if the gate passes)
+make export && make api    # API on http://localhost:8000/docs
+make webapp                # web app on http://localhost:8501 (other terminal)
+make test                  # unit + integration tests
 ```
 
-| Service | URL |
-|---------|-----|
-| MLflow | http://localhost:5000 |
-| S3 file browser | http://localhost:8888/buckets/ |
-
-Run `make help` to list every command.
-
-## Pipeline
-
-`make pipeline` runs the DVC DAG `split → train → evaluate` (see [docs/pipeline.md](docs/pipeline.md)).
-Each step logs to MLflow, and the evaluation gate promotes the model to `@staging` only if it beats the baseline.
-
-## API
-
-FastAPI with Swagger UI at `/docs`. It accepts a ride as JSON (`POST /predict`) or as a parquet/CSV file
-(`POST /predict/file`, several rides at once), and also exposes `/health`, `/feedback` and Prometheus `/metrics`.
-See [docs/api.md](docs/api.md).
+**Prod (Kubernetes)**
 
 ```bash
-make export && make api      # http://localhost:8000/docs
+make kind-up image image-webapp kind-load k8s-deploy   # whole stack in the kind cluster
+make k8s-status            # pods, services, volumes
+make e2e                   # end-to-end tests against prod
+make simulate              # replay real rides -> Grafana dashboard
 ```
 
-## Web app
-
-Streamlit app (`make webapp`, http://localhost:8501) for testing the model through the API.
-
-- Upload a parquet/CSV file, or pick example rides from the test split.
-- View each ride's accelerometer and gyroscope signals.
-- Classify every ride in one call and compare with the true label when the file has one.
-- Send feedback.
-
-The app only calls the API and never loads the model. Its configuration is `API_URL`.
-
-```bash
-make api        # terminal 1
-make webapp     # terminal 2
-```
-
-## Monitoring
-
-Prometheus and Grafana run in dev and prod from the same config. The dashboard has 4 layers (infrastructure,
-inputs, predictions, outcome from `/feedback`), with 8 alerts, each linked to a runbook. `make simulate`
-replays real rides, and `make simulate-unit-bug` triggers an incident.
-See [docs/monitoring.md](docs/monitoring.md) and [docs/runbooks.md](docs/runbooks.md).
-
-## Data
-
-| File | Content |
-|------|---------|
-| `GBG500.parquet` | 500 Gothenburg rides, 1.53M IMU rows (`ride_id, time_index, ax..rz`) |
-| `GBG500_labels.csv` | One label per ride: Safe 416, Safe overall 38, Bad weather 22, Tandem 18, Reckless 6 |
-| `SRV3490.parquet` | 3,490 rides in 8 cities with a `topple` (fall) flag (optional / auxiliary) |
-
-The data is versioned with DVC and stored in the S3 `dvc` bucket (see [docs/data.md](docs/data.md)).
+After the first deployment, **GitHub Actions** handles everything:
+- every merge to `main` redeploys (`cd.yml`)
+- *Actions → Retrain & redeploy* retrains and promotes a new model (`retrain.yml`)
 
 ## Results
 
-1D-CNN on 25.6 s IMU windows, class-weighted loss, early stopping on validation macro F1 (see [docs/model.md](docs/model.md)).
-Scores are ride-level. The baseline always predicts "Safe".
+**Model** (ride level; the baseline always predicts "Safe"):
 
-| Split (75 rides) | Macro F1 | Balanced accuracy | Accuracy | Baseline macro F1 | Baseline accuracy |
-|------------------|----------|-------------------|----------|-------------------|-------------------|
-| Validation (best epoch 17) | **0.567** | 0.565 | 0.747 | 0.181 | 0.827 |
-| Test (evaluation gate) | **0.317** | 0.458 | 0.693 | 0.181 | 0.827 |
+| Split (75 rides) | Macro F1 | Balanced accuracy | Accuracy |
+|------------------|----------|-------------------|----------|
+| Validation (best epoch 17) | **0.567** | 0.565 | 0.747 |
+| Test (evaluation gate) | **0.317** | 0.458 | 0.693 |
+| Majority baseline | 0.181 | 0.200 | 0.827 |
 
-The model beats the baseline on macro F1 and balanced accuracy. The baseline's higher accuracy only reflects the
-83 % share of Safe rides. Val and test each hold a single Reckless ride and 3 Tandem / Bad weather rides, so the
-scores vary a lot between epochs and splits. The next improvement would be cross-validation or data augmentation.
+The model clearly beats the baseline on the imbalance-aware metrics (macro F1, balanced accuracy). The baseline's
+accuracy only reflects the 83 % share of Safe rides. Val and test hold a single Reckless ride each, so per-class
+scores are noisy. Cross-validation or data augmentation would be the next modelling step.
 
-*(Screenshots of MLflow to come.)*
+**Serving** (one process, laptop): `/predict` handles 16.5 rides/s with a P95 of 340 ms and 0 failures in a
+1-minute Locust test (20 users). The whole test split (75 rides) goes through `/predict/file` in 1.1 s.
+
+**Operations:**
+
+| What | Result |
+|------|--------|
+| CD runs | Export from the prod registry, build, push, `kind load`, zero-downtime rolling update and 5/5 e2e tests on prod, in one workflow on the self-hosted runner |
+| Retraining | Deterministic: the same data and seed give the same scores in dev and prod |
+
+### Screenshots
+
+| | |
+|---|---|
+| MLflow: runs, metrics per epoch, registry with `@staging` ![MLflow](docs/screenshots/mlflow.png) | Swagger UI of the prod API ![Swagger](docs/screenshots/swagger.png) |
+| Web app: signals, prediction, probabilities ![Web app](docs/screenshots/webapp.png) | Grafana: 4-layer dashboard ![Grafana](docs/screenshots/grafana.png) |
+| GitHub Actions: CD run on the self-hosted runner ![CD](docs/screenshots/cd-run.png) | Kubernetes: pods of the prod namespace ![Pods](docs/screenshots/k8s-pods.png) |
+
+## Technical choices
+
+| Choice | Why |
+|--------|-----|
+| **Split by ride, stratified, ≥ 1 ride of each class per split** | Windows of one ride are correlated, so splitting by row would leak. With 6 Reckless rides, a random split often leaves val or test without any |
+| **1D-CNN on 25.6 s windows, mean of window probabilities per ride** | Rides have 1,800 to 4,800 samples: windows give more training examples and a fixed input size. Global average pooling makes the network accept any length |
+| **Class-weighted loss, early stopping and gate on macro F1** | 83 % of rides are Safe, so accuracy is meaningless. The gate requires macro F1 above a floor **and** above the majority baseline |
+| **One MLflow pyfunc = preprocessing + model** | Gap filling, the scaler fitted on train, windowing and aggregation travel with the weights, so serving cannot drift from training |
+| **Model baked into the API image** | A tagged image is a frozen, reproducible model. Pods never depend on MLflow at runtime, and rolling back the model means rolling back the image |
+| **SeaweedFS instead of MinIO** | MinIO stopped publishing images (`minio/minio` is gone from Docker Hub, Quay refuses anonymous pulls). SeaweedFS is the S3 store of the course labs, and all code speaks plain S3 (boto3, DVC, MLflow) |
+| **kind + kustomize instead of Helm charts** | Same tooling as the labs. Plain manifests fit a 4 GB Docker VM, which full Helm charts such as kube-prometheus-stack (~1.5 GB) would not |
+| **Self-hosted runner, never triggered by pull requests** | The cluster is local, so only a runner on that machine can deploy. Since the repo is public, forks must never run code on it |
+| **Readiness (`/ready`) separate from liveness (`/health`)** | A pod without a model gets no traffic. Kubernetes does not restart it in a loop, because a restart would not fix a missing model |
+| **No real data in published artifacts** | The MLflow input example is synthetic, and it is stripped from the exported model: the public images contain no course data |
+| **Core dependencies + `dev` / `webapp` groups** | The API image installs the core only, and the web-app image has no torch or MLflow. CPU-only torch on Linux saves ~2 GB |
 
 ## Docker images
 
@@ -138,14 +168,41 @@ scores vary a lot between epochs and splits. The next improvement would be cross
 | API (model baked in) | [`nicogil7/ride-classifier-api`](https://hub.docker.com/r/nicogil7/ride-classifier-api) |
 | Web app | [`nicogil7/ride-classifier-webapp`](https://hub.docker.com/r/nicogil7/ride-classifier-webapp) |
 
+Tags are the commit SHA (deployed by CD) and `latest`.
+
 ```bash
-docker run -p 8000:8000 nicogil7/ride-classifier-api:latest                       # http://localhost:8000/docs
+docker run -p 8000:8000 nicogil7/ride-classifier-api:latest       # http://localhost:8000/docs
 docker run -p 8501:8501 -e API_URL=http://host.docker.internal:8000 nicogil7/ride-classifier-webapp:latest
 ```
 
-`make image image-webapp` builds them, `make app` runs both with docker compose, and `make push` publishes them.
-See [docs/docker.md](docs/docker.md).
+## Data
 
-## Contributing
+| File | Content |
+|------|---------|
+| `GBG500.parquet` | 500 Gothenburg rides, 1.53 M IMU rows: the training data |
+| `GBG500_labels.csv` | One label per ride: Safe 416, Safe overall 38, Bad weather 22, Tandem 18, Reckless 6 |
+| `SRV3490.parquet` | 3,490 rides with a `topple` (fall) flag: not used for the 5-class task |
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+0.7 % of the rows are sensor dropouts, where all 6 channels are missing at once. They are interpolated inside
+each ride, and a ride with more than 5 % missing samples is rejected. Details in [docs/data.md](docs/data.md).
+
+## Repository layout
+
+```
+src/ride_classifier/   one module per step (python -m ride_classifier.<step>): data, features, model, train,
+                       evaluate, export_model, simulate, client; api/ (main, schemas, metrics)
+webapp/                Streamlit app
+params.yaml, dvc.yaml  parameters and pipeline DAG
+Dockerfile, docker/    API image, web app image, MLflow server image
+k8s/                   prod manifests (kustomize)
+infra/                 S3 and monitoring configs (shared by dev and prod)
+tests/                 unit, integration, end-to-end
+.github/workflows/     ci.yml, cd.yml, retrain.yml
+docs/                  data, model, pipeline, api, docker, kubernetes, cicd, monitoring, runbooks
+```
+
+## Documentation
+
+[Data](docs/data.md) · [Model & MLflow](docs/model.md) · [Pipeline](docs/pipeline.md) · [API](docs/api.md) ·
+[Docker](docs/docker.md) · [Kubernetes](docs/kubernetes.md) · [CI/CD](docs/cicd.md) ·
+[Monitoring](docs/monitoring.md) · [Runbooks](docs/runbooks.md) · [Contributing](CONTRIBUTING.md)

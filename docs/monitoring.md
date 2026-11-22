@@ -20,7 +20,7 @@ in dev, and the password comes from the `GRAFANA_ADMIN_PASSWORD` Secret in prod.
 |-------|--------|-----------------------|
 | 1 · Infrastructure | instances up, model version served, `/predict` latency P50/P95, requests/s by status | `ApiDown`, `LatencyP95High` (> 1 s), `ErrorRateHigh` (> 5 % 5xx) |
 | 2 · Inputs | median per-ride mean of each IMU channel, median ride duration, P90 sensor-dropout share | `InputGravityShift` (median `ay` > -5 m/s²), `SensorDropoutsHigh` (P90 > 5 %) |
-| 3 · Predictions | share of rides per predicted class, median confidence | `PredictedRecklessShareHigh` (> 15 %), `PredictionConfidenceLow` (< 0.4) |
+| 3 · Predictions | share of rides per predicted class, median confidence | `RecklessShareHigh` (> 15 %), `ConfidenceLow` (< 0.4) |
 | 4 · Outcome | accuracy on rides with a true label (`POST /feedback`), labels per class correct/wrong | `FeedbackAccuracyLow` (< 50 %, ≥ 10 labels/h) |
 
 Thresholds come from the baselines measured on the test split with model v1: 69 % Safe, 5 % Reckless,

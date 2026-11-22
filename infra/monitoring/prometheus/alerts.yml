@@ -50,7 +50,7 @@ groups:
           runbook: docs/runbooks.md#input-drift
 
       # Layer 3: prediction distribution
-      - alert: PredictedRecklessShareHigh
+      - alert: RecklessShareHigh
         expr: sum(rate(prediction_total{label="Reckless"}[15m])) / sum(rate(prediction_total[15m])) > 0.15
         for: 5m
         labels: {severity: ticket, layer: prediction}
@@ -58,7 +58,7 @@ groups:
           summary: "More than 15 % of rides predicted Reckless (baseline 5 %)"
           runbook: docs/runbooks.md#prediction-drift
 
-      - alert: PredictionConfidenceLow
+      - alert: ConfidenceLow
         expr: histogram_quantile(0.5, sum by (le) (rate(prediction_confidence_bucket[15m]))) < 0.4
         for: 5m
         labels: {severity: ticket, layer: prediction}
