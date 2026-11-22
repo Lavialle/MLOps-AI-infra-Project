@@ -4,6 +4,11 @@
 -include .env
 export
 
+DOCKERHUB_USER ?= local
+VERSION ?= $(shell git rev-parse --short HEAD)
+IMAGE_API := $(DOCKERHUB_USER)/ride-classifier-api
+IMAGE_WEBAPP := $(DOCKERHUB_USER)/ride-classifier-webapp
+
 help: ## Command list
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
@@ -52,6 +57,20 @@ load: ## Load test 1 min, 20 users (results in reports/load_*)
 	mkdir -p reports
 	uv run locust -f loadtest/locustfile.py --host http://localhost:8000 --headless -u 20 -r 5 -t 1m --csv reports/load
 
+# --- Docker images (step 6) ----------------------------------------------------
+image: export ## Builds the API image with model @staging: $(IMAGE_API):$(VERSION) + :latest
+	docker build -t $(IMAGE_API):$(VERSION) -t $(IMAGE_API):latest .
+
+image-webapp: ## Builds the web app image: $(IMAGE_WEBAPP):$(VERSION) + :latest
+	docker build -f docker/webapp/Dockerfile -t $(IMAGE_WEBAPP):$(VERSION) -t $(IMAGE_WEBAPP):latest .
+
+app: ## Runs API + web app containers with the dev stack (http://localhost:8000/docs, http://localhost:8501)
+	docker compose --profile app up -d
+
+push: ## Pushes both images to Docker Hub (docker login + DOCKERHUB_USER in .env)
+	docker push $(IMAGE_API):$(VERSION) && docker push $(IMAGE_API):latest
+	docker push $(IMAGE_WEBAPP):$(VERSION) && docker push $(IMAGE_WEBAPP):latest
+
 # --- Code quality ---------------------------------------------------------------
 lint: ## Ruff
 	uv run ruff check --fix src tests && uv run ruff format --check src tests
@@ -59,4 +78,4 @@ lint: ## Ruff
 test: ## Tests
 	uv run pytest -q
 
-.PHONY: help setup up down pull data train evaluate pipeline dag export api webapp load lint test
+.PHONY: help setup up down pull data train evaluate pipeline dag export api webapp load image image-webapp app push lint test

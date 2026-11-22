@@ -1,9 +1,11 @@
 #   docker compose up -d                  # S3 + MLflow
+#   docker compose --profile app up -d    # + API and web app containers (make image image-webapp first)
 #
 # URLs : MLflow http://localhost:5000 · S3 API http://localhost:8333 (no web page)
 #        S3 file browser http://localhost:8888/buckets/ · SeaweedFS status http://localhost:9333
+#        API http://localhost:8000/docs · Web app http://localhost:8501
 #
-# API, web app (step 4-6) and Prometheus/Grafana (step 9) are added later.
+# Prometheus/Grafana (step 9) are added later.
 
 name: ride-classifier
 
@@ -82,6 +84,30 @@ services:
         condition: service_healthy
       s3-init:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Containerized API. Model is in the image:
+  #   make image   (= export @staging + docker build)
+  api:
+    profiles: ["app"]
+    image: ${DOCKERHUB_USER:-local}/ride-classifier-api:latest
+    environment:
+      PREDICTION_LOG_PATH: /app/logs/predictions.jsonl
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  webapp:
+    profiles: ["app"]
+    image: ${DOCKERHUB_USER:-local}/ride-classifier-webapp:latest
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:

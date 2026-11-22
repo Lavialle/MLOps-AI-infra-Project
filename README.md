@@ -124,7 +124,13 @@ scores vary a lot between epochs and splits. The next improvement would be cross
 
 ## Docker images
 
-*(To come: Docker Hub URLs.)*
+| Image | Docker Hub |
+|-------|-----------|
+| API (model baked in) | *(to come)* |
+| Web app | *(to come)* |
+
+`make image image-webapp` builds them, `make app` runs both with docker compose, and `make push` publishes them.
+See [docs/docker.md](docs/docker.md).
 
 ## Contributing
 
