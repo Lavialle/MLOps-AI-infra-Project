@@ -99,9 +99,15 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # The self-hosted machine is a laptop: old image layers must not fill its disk
+      # The self-hosted machine is a laptop: old image versions must not fill its disk.
+      # Only OUR images, except the one just deployed (older tags stay on Docker Hub: a rollback re-pulls them).
       - name: Clean up old images
         if: always()
         run: |
+          docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep -E "^$DOCKERHUB_USER/ride-classifier-(api|webapp):" | grep -vE ":($TAG|latest)$" \
+            | xargs -r docker rmi > /dev/null || true
           docker image prune -f
-          docker exec ride-classifier-control-plane crictl rmi --prune > /dev/null 2>&1 || true
+          docker exec ride-classifier-control-plane sh -c \
+            "crictl images | awk '\$1 ~ /ride-classifier-(api|webapp)\$/ && \$2 != \"$TAG\" {print \$1\":\"\$2}' | xargs -r crictl rmi" \
+            > /dev/null 2>&1 || true
