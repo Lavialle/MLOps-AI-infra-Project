@@ -20,14 +20,16 @@ The input is each ride's IMU time series (accelerometer `ax, ay, az` and gyrosco
 
 *(Diagram to come.)*
 
-| Component | Dev (docker compose) | Prod (Kubernetes) |
+| Component | Dev (`make up`, `make app`) | Prod (kind cluster, `make k8s-deploy`) |
 |-----------|----------------------|-------------------|
-| Object storage (S3) | SeaweedFS | SeaweedFS |
+| Object storage (S3) | SeaweedFS | SeaweedFS + PVC |
 | Data versioning & pipeline | DVC (S3 remote) | – |
-| Experiment tracking & registry | MLflow + Postgres | MLflow + Postgres |
-| Prediction API | FastAPI | FastAPI |
-| Web app | Streamlit | Streamlit |
-| Monitoring | Prometheus + Grafana | Prometheus + Grafana |
+| Experiment tracking & registry | MLflow + Postgres, http://localhost:5000 | MLflow + Postgres (PVC), http://localhost:5050 |
+| Prediction API | FastAPI, http://localhost:8000 | 2 replicas, http://localhost:8080 |
+| Web app | Streamlit, http://localhost:8501 | http://localhost:8081 |
+| Monitoring | – | Prometheus + Grafana (step 9) |
+
+See [docs/kubernetes.md](docs/kubernetes.md) for the production environment.
 
 **Why SeaweedFS and not MinIO.** The brief asks for "AWS S3 (Minio)". MinIO no longer publishes its Docker images:
 `minio/minio` is gone from Docker Hub and `quay.io/minio/minio` refuses anonymous pulls. We therefore use SeaweedFS,

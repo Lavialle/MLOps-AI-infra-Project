@@ -71,6 +71,31 @@ push: ## Pushes both images to Docker Hub (docker login + DOCKERHUB_USER in .env
 	docker push $(IMAGE_API):$(VERSION) && docker push $(IMAGE_API):latest
 	docker push $(IMAGE_WEBAPP):$(VERSION) && docker push $(IMAGE_WEBAPP):latest
 
+# --- Kubernetes "prod" (step 7) ------------------------------------------------
+CLUSTER := ride-classifier
+K8S_NS := ride-classifier
+
+kind-up: ## Creates the kind cluster (ports: API 8080, web app 8081, MLflow 5050)
+	kind create cluster --name $(CLUSTER) --config k8s/kind-config.yaml
+
+k8s-secrets: ## Creates k8s/secrets/ (git-ignored) from k8s/secrets.example if missing
+	mkdir -p k8s/secrets
+	cp -n k8s/secrets.example/secrets.env k8s/secrets.example/s3.json k8s/secrets/ || true
+
+kind-load: ## Loads local images into kind (faster than pulling 2.5 GB from Docker Hub)
+	kind load docker-image ride-classifier-mlflow:3.18.0 $(IMAGE_API):latest $(IMAGE_WEBAPP):latest --name $(CLUSTER)
+
+k8s-deploy: k8s-secrets ## Deploys everything (kubectl apply -k k8s/) and waits for the rollouts
+	kubectl apply -k k8s/
+	kubectl -n $(K8S_NS) rollout status deploy/s3 deploy/postgres deploy/mlflow --timeout=300s
+	kubectl -n $(K8S_NS) rollout status deploy/ride-classifier-api deploy/ride-classifier-webapp --timeout=300s
+
+k8s-status: ## Pods, services, volumes of the prod namespace
+	kubectl -n $(K8S_NS) get pods,svc,pvc -o wide
+
+kind-down: ## Drops the cluster (all prod data is lost)
+	kind delete cluster --name $(CLUSTER)
+
 # --- Code quality ---------------------------------------------------------------
 lint: ## Ruff
 	uv run ruff check --fix src tests && uv run ruff format --check src tests
@@ -78,4 +103,5 @@ lint: ## Ruff
 test: ## Tests
 	uv run pytest -q
 
-.PHONY: help setup up down pull data train evaluate pipeline dag export api webapp load image image-webapp app push lint test
+.PHONY: help setup up down pull data train evaluate pipeline dag export api webapp load image image-webapp app push
+.PHONY: kind-up k8s-secrets kind-load k8s-deploy k8s-status kind-down lint test
