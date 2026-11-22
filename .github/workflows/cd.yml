@@ -1,0 +1,107 @@
+name: CD (build, push, deploy to Kubernetes)
+
+# Continuous deployment of the API and the web app to the "prod" kind cluster.
+#   export model @staging (prod MLflow) -> build images -> push to Docker Hub -> load into kind
+#   -> rolling update with the commit tag -> end-to-end tests -> automatic rollback if they fail
+#
+# Runs on the SELF-HOSTED runner (the machine that hosts the kind cluster), see docs/cicd.md.
+# Never triggered by pull requests: code from a fork must not run on the self-hosted machine.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**.md"]
+  workflow_dispatch:
+  workflow_call: # called by retrain.yml after a model was promoted
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOCKERHUB_USER: ${{ vars.DOCKERHUB_USER || 'nicogil7' }}
+  MLFLOW_TRACKING_URI: http://localhost:5050 # prod MLflow (NodePort)
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 45
+    # Optional manual approval: Settings > Environments > production > Required reviewers
+    environment: production
+    env:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }} # optional (see docs/cicd.md)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag of this deployment
+        run: echo "TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Dependencies (exact versions from uv.lock)
+        run: uv sync --locked
+
+      - name: Cluster is up (created if missing)
+        run: |
+          make kind-up
+          curl -sf http://localhost:5050/health > /dev/null \
+            || { echo "::error::Prod MLflow unreachable on :5050. Run 'make kind-load k8s-deploy' once."; exit 1; }
+
+      - name: Export the model promoted to @staging (prod registry)
+        run: |
+          make export || { echo "::error::No @staging model in prod MLflow: run the Retrain workflow first."; exit 1; }
+          echo "MODEL_VERSION=$(python3 -c 'import json; print(json.load(open("model/model_meta.json"))["version"])')" >> "$GITHUB_ENV"
+
+      - name: Build images
+        run: |
+          docker build -t $DOCKERHUB_USER/ride-classifier-api:$TAG -t $DOCKERHUB_USER/ride-classifier-api:latest .
+          docker build -f docker/webapp/Dockerfile \
+            -t $DOCKERHUB_USER/ride-classifier-webapp:$TAG -t $DOCKERHUB_USER/ride-classifier-webapp:latest .
+
+      # With the DOCKERHUB_TOKEN secret, log in explicitly; otherwise use the runner machine's Docker login.
+      - name: Docker Hub login
+        if: ${{ env.DOCKERHUB_TOKEN != '' }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+
+      - name: Push images to Docker Hub
+        run: make push VERSION=$TAG
+
+      - name: Load images into kind
+        run: make kind-load TAG=$TAG
+
+      - name: Rolling update (zero downtime, see k8s/api.yaml)
+        run: make k8s-deploy TAG=$TAG
+
+      - name: End-to-end tests against prod
+        env:
+          E2E_API_URL: http://localhost:8080
+          E2E_WEBAPP_URL: http://localhost:8081
+          E2E_MODEL_VERSION: ${{ env.MODEL_VERSION }}
+        run: uv run --no-sync pytest -v tests/test_e2e.py
+
+      - name: Roll back if the deployment is broken
+        if: failure()
+        run: |
+          kubectl --context kind-ride-classifier -n ride-classifier rollout undo deploy/ride-classifier-api || true
+          kubectl --context kind-ride-classifier -n ride-classifier rollout undo deploy/ride-classifier-webapp || true
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deployment ${{ job.status }}: \`$TAG\`, model v${MODEL_VERSION:-?}"
+            echo "- API: http://localhost:8080/docs · Web app: http://localhost:8081 · MLflow: http://localhost:5050"
+            echo "- Images: \`$DOCKERHUB_USER/ride-classifier-api:$TAG\`, \`$DOCKERHUB_USER/ride-classifier-webapp:$TAG\`"
+            echo '```'
+            kubectl --context kind-ride-classifier -n ride-classifier get pods -o wide 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The self-hosted machine is a laptop: old image layers must not fill its disk
+      - name: Clean up old images
+        if: always()
+        run: |
+          docker image prune -f
+          docker exec ride-classifier-control-plane crictl rmi --prune > /dev/null 2>&1 || true
