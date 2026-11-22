@@ -44,7 +44,7 @@ Prod commands assume the kind cluster (`K="kubectl --context kind-ride-classifie
 
 ## prediction-drift
 
-**Alerts `PredictedRecklessShareHigh`, `PredictionConfidenceLow`**: the output distribution moved (baseline on the
+**Alerts `RecklessShareHigh`, `ConfidenceLow`**: the output distribution moved (baseline on the
 test split: 69 % Safe, 5 % Reckless, median confidence 0.54).
 
 1. Check row 2 first: an input incident (above) explains most prediction drifts.
