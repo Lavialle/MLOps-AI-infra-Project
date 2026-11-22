@@ -1,0 +1,85 @@
+#   docker compose up -d                  # S3 + MLflow
+#
+# URLs : MLflow http://localhost:5000 · S3 API http://localhost:8333 (no web page)
+#        S3 file browser http://localhost:8888/buckets/ · SeaweedFS status http://localhost:9333
+#
+# API, web app (step 4-6) and Prometheus/Grafana (step 9) are added later.
+
+name: ride-classifier
+
+x-s3-env: &s3-env
+  AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-mlops}
+  AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-mlops-secret}
+  AWS_DEFAULT_REGION: us-east-1
+  MLFLOW_S3_ENDPOINT_URL: http://s3:8333
+
+services:
+  # S3 storage - remote DVC & MLflow artifact store
+  s3:
+    image: chrislusf/seaweedfs:${SEAWEEDFS_VERSION:-latest}
+    # The S3 API and the filer must use different ports: the filer listens on 8888 by default.
+    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -volume.max=20
+    ports:
+      - "8333:8333"   # S3 API (DVC, MLflow, boto3): signed requests only, no web page
+      - "8888:8888"   # filer: browse files in a browser at /buckets/
+      - "9333:9333"   # master: cluster status page
+    volumes:
+      - s3-data:/data
+      - ./infra/s3/s3.json:/etc/seaweedfs/s3.json:ro
+    restart: unless-stopped
+
+  # Creates buckets "mlflow" & "dvc" at first start, then stops
+  s3-init:
+    build: ./docker/mlflow
+    image: ride-classifier-mlflow:3.18.0
+    entrypoint: ["python", "/scripts/create_buckets.py"]
+    environment:
+      <<: *s3-env
+      BUCKETS: mlflow,dvc
+    volumes:
+      - ./infra/s3/create_buckets.py:/scripts/create_buckets.py:ro
+    depends_on:
+      - s3
+    restart: "no"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+      POSTGRES_DB: mlflow
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Tracking + Model Registry. Artifacts flow through the server (--serve-artifacts) so clients don't need s3 creds
+  mlflow:
+    build: ./docker/mlflow
+    image: ride-classifier-mlflow:3.18.0
+    command: >
+      mlflow server
+      --host 0.0.0.0 --port 5000
+      --backend-store-uri postgresql+psycopg://mlflow:mlflow@postgres:5432/mlflow
+      --artifacts-destination s3://mlflow
+      --serve-artifacts
+      --allowed-hosts "localhost,localhost:*,127.0.0.1:*,mlflow:*,host.docker.internal:*,*.app.github.dev"
+    environment:
+      <<: *s3-env
+      MLFLOW_DISABLE_AGENT_HINT: "1"
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"   # macOS: AirPlay Receiver squats 5000 -> set MLFLOW_PORT=5001 in .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      s3-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  s3-data:
+  pg-data:

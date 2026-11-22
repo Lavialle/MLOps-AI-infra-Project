@@ -1,0 +1,56 @@
+[project]
+name = "ride-classifier"
+version = "0.1.0"
+description = "MLOps project: classify bike rides (Safe, Safe overall, Bad weather, Tandem, Reckless) from IMU time series"
+requires-python = ">=3.14"
+dependencies = [
+    "boto3>=1.43.117",
+    "dvc>=3.67.1",
+    "dvc-s3>=3.3.0",
+    "fastapi>=0.165.0",
+    "httpx>=0.28.1",
+    "locust>=2.47.0",
+    "mlflow>=3.18.0",
+    "numpy>=2.5.5",
+    "pandas>=3.1.1",
+    "prometheus-client>=0.26.0",
+    "pyarrow>=26.0.1",
+    "pydantic>=2.14.4",
+    "pytest>=9.2.0",
+    "python-multipart>=0.0.34",
+    "pyyaml>=6.0.4",
+    "ruff>=0.17.6",
+    "scikit-learn>=1.9.1",
+    "streamlit>=1.67.0",
+    "torch>=2.15.0",
+    "uvicorn>=0.54.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# On Linux (CI runners, Docker images) install CPU-only torch wheels: ~200 MB instead of ~2.5 GB of CUDA.
+# macOS keeps the PyPI build (Apple-silicon MPS support).
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]
