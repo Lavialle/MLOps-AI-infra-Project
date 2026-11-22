@@ -19,7 +19,9 @@ train:
   epochs: 30
   batch_size: 64
   learning_rate: 0.001
+  dropout: 0.3
   class_weighting: balanced   # 416 Safe vs 6 Reckless: weight the loss by inverse class frequency
+  patience: 8                 # early stopping on validation ride-level macro F1
   random_state: 42
 
 gate:

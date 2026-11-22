@@ -77,7 +77,19 @@ The data is versioned with DVC and stored in the S3 `dvc` bucket (see [docs/data
 
 ## Results
 
-*(To come: metrics vs. baseline, confusion matrix, screenshots.)*
+1D-CNN on 25.6 s IMU windows, class-weighted loss, early stopping on validation macro F1 (see [docs/model.md](docs/model.md)).
+Scores are ride-level. The baseline always predicts "Safe".
+
+| Split (75 rides) | Macro F1 | Balanced accuracy | Accuracy | Baseline macro F1 | Baseline accuracy |
+|------------------|----------|-------------------|----------|-------------------|-------------------|
+| Validation (best epoch 17) | **0.567** | 0.565 | 0.747 | 0.181 | 0.827 |
+| Test (evaluation gate) | **0.317** | 0.458 | 0.693 | 0.181 | 0.827 |
+
+The model beats the baseline on macro F1 and balanced accuracy. The baseline's higher accuracy only reflects the
+83 % share of Safe rides. Val and test each hold a single Reckless ride and 3 Tandem / Bad weather rides, so the
+scores vary a lot between epochs and splits. The next improvement would be cross-validation or data augmentation.
+
+*(Screenshots of MLflow to come.)*
 
 ## Docker images
 

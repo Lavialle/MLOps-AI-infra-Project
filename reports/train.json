@@ -1,0 +1,22 @@
+{
+  "run_id": "1b5ee725779c4767a7eb1ac53f3db480",
+  "model_name": "ride-classifier",
+  "model_version": "1",
+  "val_macro_f1": 0.5669841269841269,
+  "val_balanced_accuracy": 0.5645161290322581,
+  "val_accuracy": 0.7466666666666667,
+  "val_recall_safe": 0.8225806451612904,
+  "val_recall_safe_overall": 0.3333333333333333,
+  "val_recall_bad_weather": 0.3333333333333333,
+  "val_recall_tandem": 0.3333333333333333,
+  "val_recall_reckless": 1.0,
+  "val_baseline_macro_f1": 0.181021897810219,
+  "val_baseline_balanced_accuracy": 0.2,
+  "val_baseline_accuracy": 0.8266666666666667,
+  "val_baseline_recall_safe": 1.0,
+  "val_baseline_recall_safe_overall": 0.0,
+  "val_baseline_recall_bad_weather": 0.0,
+  "val_baseline_recall_tandem": 0.0,
+  "val_baseline_recall_reckless": 0.0,
+  "best_epoch": 17
+}
