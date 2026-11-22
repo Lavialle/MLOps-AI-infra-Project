@@ -1,0 +1,90 @@
+name: Retrain & redeploy
+
+# Retraining pipeline (bonus): data -> training -> evaluation gate -> promotion -> redeploy.
+#   gh workflow run retrain.yml -f reason="new data"        (or Actions > Retrain & redeploy > Run workflow)
+#
+# Everything happens in PROD: data pulled with DVC from the prod S3, run logged and model registered in the
+# prod MLflow. If the gate fails, the workflow stops and the model in production is left untouched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why this retraining?"
+        default: "manual"
+  schedule:
+    - cron: "0 6 * * 1" # every Monday 06:00 UTC (only if the self-hosted runner is online)
+
+concurrency:
+  group: retrain
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  MLFLOW_TRACKING_URI: http://localhost:5050 # prod MLflow (NodePort)
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+
+jobs:
+  train:
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencies (exact versions from uv.lock)
+        run: uv sync --locked
+
+      - name: Prod MLflow is reachable
+        run: |
+          curl -sf http://localhost:5050/health > /dev/null \
+            || { echo "::error::Prod cluster not running (MLflow :5050). Run 'make kind-up kind-load k8s-deploy'."; exit 1; }
+
+      # Prod S3 is internal to the cluster: expose it on :8333, the DVC remote endpoint
+      - name: Data (DVC pull from prod S3)
+        env:
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY || 'mlops' }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY || 'mlops-secret' }}
+        run: |
+          kubectl --context kind-ride-classifier -n ride-classifier port-forward svc/s3 8333:8333 > pf.log 2>&1 &
+          echo $! > pf.pid
+          for i in $(seq 1 30); do nc -z localhost 8333 && break; sleep 1; done
+          uv run --no-sync dvc remote modify --local storage access_key_id "$S3_ACCESS_KEY"
+          uv run --no-sync dvc remote modify --local storage secret_access_key "$S3_SECRET_KEY"
+          uv run --no-sync dvc pull data/raw/GBG500.parquet.dvc data/raw/GBG500_labels.csv.dvc
+
+      - name: Split
+        run: uv run --no-sync python -m ride_classifier.data
+
+      - name: Training (logged to prod MLflow, new registered version)
+        run: uv run --no-sync python -m ride_classifier.train
+
+      - name: Evaluation gate (macro F1 on the test split, promotes to @staging if passed)
+        run: uv run --no-sync python -m ride_classifier.evaluate
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Retraining: ${{ inputs.reason || 'scheduled' }}"
+            echo "MLflow: http://localhost:5050"
+            echo '```json'; cat reports/train.json 2>/dev/null; cat reports/eval.json 2>/dev/null; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: reports/*.json
+          retention-days: 30
+
+      - name: Stop the S3 port-forward
+        if: always()
+        run: test -f pf.pid && kill "$(cat pf.pid)" || true
+
+  # Only reached when the gate passed (the evaluate step exits 1 otherwise)
+  deploy:
+    needs: train
+    uses: ./.github/workflows/cd.yml
+    secrets: inherit

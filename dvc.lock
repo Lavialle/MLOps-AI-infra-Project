@@ -57,12 +57,12 @@ stages:
       size: 3410
     - path: src/ride_classifier/model.py
       hash: md5
-      md5: e1450668832b97907b4ad5afe783b215
-      size: 5294
+      md5: 509b6d8ebfa1f8af40012ae5c45148e0
+      size: 5869
     - path: src/ride_classifier/train.py
       hash: md5
-      md5: 650e19f810974b3ba9fa90772ebd9aae
-      size: 6542
+      md5: 360e5c174c066f0318979b61b4a98cc9
+      size: 6613
     params:
       params.yaml:
         features:
@@ -80,7 +80,7 @@ stages:
     outs:
     - path: reports/train.json
       hash: md5
-      md5: 39a9780d952a957171873e0a0709c196
+      md5: 604eb2515e13c589ef14cb95349bbe79
       size: 793
   evaluate:
     cmd: python -m ride_classifier.evaluate
@@ -91,7 +91,7 @@ stages:
       size: 5317271
     - path: reports/train.json
       hash: md5
-      md5: 39a9780d952a957171873e0a0709c196
+      md5: 604eb2515e13c589ef14cb95349bbe79
       size: 793
     - path: src/ride_classifier/evaluate.py
       hash: md5

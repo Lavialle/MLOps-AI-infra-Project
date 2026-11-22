@@ -1,5 +1,5 @@
 {
-  "run_id": "1b5ee725779c4767a7eb1ac53f3db480",
+  "run_id": "923d993df5e84ee590ed389039581e11",
   "model_name": "ride-classifier",
   "model_version": "1",
   "val_macro_f1": 0.5669841269841269,

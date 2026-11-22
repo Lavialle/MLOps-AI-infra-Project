@@ -74,24 +74,35 @@ push: ## Pushes both images to Docker Hub (docker login + DOCKERHUB_USER in .env
 # --- Kubernetes "prod" (step 7) ------------------------------------------------
 CLUSTER := ride-classifier
 K8S_NS := ride-classifier
+KUBECTL := kubectl --context kind-$(CLUSTER)   # never deploy to another cluster by accident
+TAG ?= latest                                    # image tag to deploy (the CD workflow passes the git sha)
+PROD_MLFLOW := http://localhost:5050
 
 kind-up: ## Creates the kind cluster (ports: API 8080, web app 8081, MLflow 5050)
-	kind create cluster --name $(CLUSTER) --config k8s/kind-config.yaml
+	kind get clusters | grep -qx $(CLUSTER) || kind create cluster --name $(CLUSTER) --config k8s/kind-config.yaml
 
 k8s-secrets: ## Creates k8s/secrets/ (git-ignored) from k8s/secrets.example if missing
 	mkdir -p k8s/secrets
 	cp -n k8s/secrets.example/secrets.env k8s/secrets.example/s3.json k8s/secrets/ || true
 
-kind-load: ## Loads local images into kind (faster than pulling 2.5 GB from Docker Hub)
-	kind load docker-image ride-classifier-mlflow:3.18.0 $(IMAGE_API):latest $(IMAGE_WEBAPP):latest --name $(CLUSTER)
+kind-load: ## Loads local images $(TAG) into kind (faster than pulling 2.5 GB from Docker Hub)
+	kind load docker-image ride-classifier-mlflow:3.18.0 $(IMAGE_API):$(TAG) $(IMAGE_WEBAPP):$(TAG) --name $(CLUSTER)
 
-k8s-deploy: k8s-secrets ## Deploys everything (kubectl apply -k k8s/) and waits for the rollouts
-	kubectl apply -k k8s/
-	kubectl -n $(K8S_NS) rollout status deploy/s3 deploy/postgres deploy/mlflow --timeout=300s
-	kubectl -n $(K8S_NS) rollout status deploy/ride-classifier-api deploy/ride-classifier-webapp --timeout=300s
+k8s-deploy: k8s-secrets ## Deploys everything with images $(TAG) and waits for the rollouts
+	$(KUBECTL) kustomize k8s/ \
+	  | sed -e 's#$(IMAGE_API):latest#$(IMAGE_API):$(TAG)#' -e 's#$(IMAGE_WEBAPP):latest#$(IMAGE_WEBAPP):$(TAG)#' \
+	  | $(KUBECTL) apply -f -
+	$(KUBECTL) -n $(K8S_NS) rollout status deploy/s3 deploy/postgres deploy/mlflow --timeout=300s
+	$(KUBECTL) -n $(K8S_NS) rollout status deploy/ride-classifier-api deploy/ride-classifier-webapp --timeout=300s
 
 k8s-status: ## Pods, services, volumes of the prod namespace
-	kubectl -n $(K8S_NS) get pods,svc,pvc -o wide
+	$(KUBECTL) -n $(K8S_NS) get pods,svc,pvc -o wide
+
+e2e: ## End-to-end tests against prod (Kubernetes)
+	E2E_API_URL=http://localhost:8080 E2E_WEBAPP_URL=http://localhost:8081 uv run pytest -v tests/test_e2e.py
+
+s3-forward: ## Exposes prod S3 on localhost:8333 (DVC remote) until Ctrl-C. Stop the compose stack first
+	$(KUBECTL) -n $(K8S_NS) port-forward svc/s3 8333:8333
 
 kind-down: ## Drops the cluster (all prod data is lost)
 	kind delete cluster --name $(CLUSTER)
@@ -104,4 +115,4 @@ test: ## Tests
 	uv run pytest -q
 
 .PHONY: help setup up down pull data train evaluate pipeline dag export api webapp load image image-webapp app push
-.PHONY: kind-up k8s-secrets kind-load k8s-deploy k8s-status kind-down lint test
+.PHONY: kind-up k8s-secrets kind-load k8s-deploy k8s-status e2e s3-forward kind-down lint test
