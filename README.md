@@ -80,6 +80,22 @@ See [docs/api.md](docs/api.md).
 make export && make api      # http://localhost:8000/docs
 ```
 
+## Web app
+
+Streamlit app (`make webapp`, http://localhost:8501) for testing the model through the API.
+
+- Upload a parquet/CSV file, or pick example rides from the test split.
+- View each ride's accelerometer and gyroscope signals.
+- Classify every ride in one call and compare with the true label when the file has one.
+- Send feedback.
+
+The app only calls the API and never loads the model. Its configuration is `API_URL`.
+
+```bash
+make api        # terminal 1
+make webapp     # terminal 2
+```
+
 ## Data
 
 | File | Content |
