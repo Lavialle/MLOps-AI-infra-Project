@@ -70,6 +70,16 @@ Run `make help` to list every command.
 `make pipeline` runs the DVC DAG `split → train → evaluate` (see [docs/pipeline.md](docs/pipeline.md)).
 Each step logs to MLflow, and the evaluation gate promotes the model to `@staging` only if it beats the baseline.
 
+## API
+
+FastAPI with Swagger UI at `/docs`. It accepts a ride as JSON (`POST /predict`) or as a parquet/CSV file
+(`POST /predict/file`, several rides at once), and also exposes `/health`, `/feedback` and Prometheus `/metrics`.
+See [docs/api.md](docs/api.md).
+
+```bash
+make export && make api      # http://localhost:8000/docs
+```
+
 ## Data
 
 | File | Content |

@@ -80,4 +80,5 @@ def model_dir(tmp_path_factory, trained):
     torch.save(model.net.state_dict(), weights)
     path = folder / "model"
     mlflow.pyfunc.save_model(str(path), python_model=model, artifacts={"weights": str(weights)})
+    (path / "model_meta.json").write_text('{"version": "test"}')
     return path
