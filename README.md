@@ -65,6 +65,11 @@ make test
 
 Run `make help` to list every command.
 
+## Pipeline
+
+`make pipeline` runs the DVC DAG `split → train → evaluate` (see [docs/pipeline.md](docs/pipeline.md)).
+Each step logs to MLflow, and the evaluation gate promotes the model to `@staging` only if it beats the baseline.
+
 ## Data
 
 | File | Content |
