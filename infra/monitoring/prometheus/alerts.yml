@@ -1,0 +1,78 @@
+# One or two alerts per monitoring layer (same structure as the course labs).
+# Visible in Prometheus > Alerts and on the Grafana dashboard. Each alert points to its runbook.
+# Baselines measured on the test split with model v1: 69 % Safe, 5 % Reckless predicted,
+# median confidence 0.54; /predict P95 340 ms at 16 rides/s (make load).
+groups:
+  - name: ride-classifier-api
+    rules:
+      # Layer 1: infrastructure
+      - alert: ApiDown
+        expr: up{job="ride-classifier-api"} == 0
+        for: 1m
+        labels: {severity: page, layer: infra}
+        annotations:
+          summary: "An API instance has not answered the scrape for 1 minute"
+          runbook: docs/runbooks.md#api-down
+
+      - alert: LatencyP95High
+        expr: histogram_quantile(0.95, sum by (le) (rate(api_request_duration_seconds_bucket{endpoint="/predict"}[2m]))) > 1
+        for: 2m
+        labels: {severity: page, layer: infra}
+        annotations:
+          summary: "/predict P95 above 1 s (baseline 340 ms)"
+          runbook: docs/runbooks.md#latency
+
+      - alert: ErrorRateHigh
+        expr: sum(rate(api_requests_total{status=~"5.."}[2m])) / sum(rate(api_requests_total[2m])) > 0.05
+        for: 2m
+        labels: {severity: page, layer: infra}
+        annotations:
+          summary: "More than 5 % of 5xx responses"
+          runbook: docs/runbooks.md#errors
+
+      # Layer 2: input distribution
+      # Gravity is on ay (about -9.4 m/s²). A median above -5 means a unit bug (g instead of m/s²)
+      # or a phone mounted differently: the model has never seen such inputs.
+      - alert: InputGravityShift
+        expr: histogram_quantile(0.5, sum by (le) (rate(input_channel_mean_bucket{channel="ay"}[10m]))) > -5
+        for: 5m
+        labels: {severity: ticket, layer: input}
+        annotations:
+          summary: "Median of ay above -5 m/s²: unit or sensor-orientation change"
+          runbook: docs/runbooks.md#input-drift
+
+      - alert: SensorDropoutsHigh
+        expr: histogram_quantile(0.9, sum by (le) (rate(input_missing_share_bucket[10m]))) > 0.05
+        for: 5m
+        labels: {severity: ticket, layer: input}
+        annotations:
+          summary: "10 % of rides have more than 5 % missing samples (training data: at most 1.6 %)"
+          runbook: docs/runbooks.md#input-drift
+
+      # Layer 3: prediction distribution
+      - alert: PredictedRecklessShareHigh
+        expr: sum(rate(prediction_total{label="Reckless"}[15m])) / sum(rate(prediction_total[15m])) > 0.15
+        for: 5m
+        labels: {severity: ticket, layer: prediction}
+        annotations:
+          summary: "More than 15 % of rides predicted Reckless (baseline 5 %)"
+          runbook: docs/runbooks.md#prediction-drift
+
+      - alert: PredictionConfidenceLow
+        expr: histogram_quantile(0.5, sum by (le) (rate(prediction_confidence_bucket[15m]))) < 0.4
+        for: 5m
+        labels: {severity: ticket, layer: prediction}
+        annotations:
+          summary: "Median confidence below 0.4 (baseline 0.54): inputs unlike the training data"
+          runbook: docs/runbooks.md#prediction-drift
+
+      # Layer 4: business outcome (true labels received later through POST /feedback)
+      - alert: FeedbackAccuracyLow
+        expr: >-
+          sum(increase(feedback_total{correct="true"}[1h]))
+          / (sum(increase(feedback_total[1h])) > 10) < 0.5
+        for: 10m
+        labels: {severity: ticket, layer: outcome}
+        annotations:
+          summary: "Less than 50 % of the rides with a true label were classified correctly (test accuracy 69 %)"
+          runbook: docs/runbooks.md#performance

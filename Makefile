@@ -17,8 +17,11 @@ setup: ## Installs the Python environment (uv sync), once per clone
 	uv sync
 	@test -f .env || cp .env.example .env
 
-up: ## Starts S3 and MLflow
+up: ## Starts S3, MLflow, Prometheus, Grafana
 	docker compose up -d --build
+
+monitoring: ## Starts Prometheus and Grafana only (dev): http://localhost:9090, http://localhost:3000
+	docker compose up -d prometheus grafana
 
 down: ## Stops services (volumes are kept)
 	docker compose down
@@ -107,6 +110,22 @@ s3-forward: ## Exposes prod S3 on localhost:8333 (DVC remote) until Ctrl-C. Stop
 kind-down: ## Drops the cluster (all prod data is lost)
 	kind delete cluster --name $(CLUSTER)
 
+# --- Monitoring (step 9) ----------------------------------------------------------
+API_URL ?= http://localhost:8080
+
+monitoring-forward: ## Prod Grafana on http://localhost:3030 and Prometheus on http://localhost:9091 until Ctrl-C
+	$(KUBECTL) -n $(K8S_NS) port-forward svc/grafana 3030:3000 & \
+	$(KUBECTL) -n $(K8S_NS) port-forward svc/prometheus 9091:9090; kill %1
+
+simulate: ## Replays 50 test rides (+ feedback) against $(API_URL) to feed the dashboard
+	uv run python -m ride_classifier.simulate --api $(API_URL) --n 50
+
+simulate-unit-bug: ## Incident: accelerometer sent in g instead of m/s² (alerts InputGravityShift, accuracy)
+	uv run python -m ride_classifier.simulate --api $(API_URL) --n 50 --unit-bug
+
+simulate-dropouts: ## Incident: 20 % of the samples lost by the sensor (alert SensorDropoutsHigh)
+	uv run python -m ride_classifier.simulate --api $(API_URL) --n 50 --dropouts 0.2
+
 # --- Code quality ---------------------------------------------------------------
 lint: ## Ruff
 	uv run ruff check --fix src tests && uv run ruff format --check src tests
@@ -114,5 +133,6 @@ lint: ## Ruff
 test: ## Tests
 	uv run pytest -q
 
-.PHONY: help setup up down pull data train evaluate pipeline dag export api webapp load image image-webapp app push
-.PHONY: kind-up k8s-secrets kind-load k8s-deploy k8s-status e2e s3-forward kind-down lint test
+.PHONY: help setup up monitoring down pull data train evaluate pipeline dag export api webapp load image image-webapp
+.PHONY: app push kind-up k8s-secrets kind-load k8s-deploy k8s-status e2e s3-forward kind-down
+.PHONY: monitoring-forward simulate simulate-unit-bug simulate-dropouts lint test

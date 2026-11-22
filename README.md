@@ -27,7 +27,7 @@ The input is each ride's IMU time series (accelerometer `ax, ay, az` and gyrosco
 | Experiment tracking & registry | MLflow + Postgres, http://localhost:5000 | MLflow + Postgres (PVC), http://localhost:5050 |
 | Prediction API | FastAPI, http://localhost:8000 | 2 replicas, http://localhost:8080 |
 | Web app | Streamlit, http://localhost:8501 | http://localhost:8081 |
-| Monitoring | – | Prometheus + Grafana (step 9) |
+| Monitoring | Prometheus :9090 + Grafana :3000 | Prometheus (pod discovery) + Grafana, http://localhost:3030 |
 
 See [docs/kubernetes.md](docs/kubernetes.md) for the production environment.
 
@@ -97,6 +97,13 @@ The app only calls the API and never loads the model. Its configuration is `API_
 make api        # terminal 1
 make webapp     # terminal 2
 ```
+
+## Monitoring
+
+Prometheus and Grafana run in dev and prod from the same config. The dashboard has 4 layers (infrastructure,
+inputs, predictions, outcome from `/feedback`), with 8 alerts, each linked to a runbook. `make simulate`
+replays real rides, and `make simulate-unit-bug` triggers an incident.
+See [docs/monitoring.md](docs/monitoring.md) and [docs/runbooks.md](docs/runbooks.md).
 
 ## Data
 
