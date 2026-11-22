@@ -40,6 +40,15 @@ dag: ## Prints the pipeline DAG (dvc.yaml)
 export: ## Downloads model @staging in ./model
 	uv run python -m ride_classifier.export_model
 
+# --- Serving -------------------------------------------------------------------
+api: ## Local API (model ./model, run `make export` first), logs in logs/predictions.jsonl
+	mkdir -p logs
+	PREDICTION_LOG_PATH=logs/predictions.jsonl MODEL_URI=model uv run uvicorn ride_classifier.api.main:app --reload --host 0.0.0.0 --port 8000
+
+load: ## Load test 1 min, 20 users (results in reports/load_*)
+	mkdir -p reports
+	uv run locust -f loadtest/locustfile.py --host http://localhost:8000 --headless -u 20 -r 5 -t 1m --csv reports/load
+
 # --- Code quality ---------------------------------------------------------------
 lint: ## Ruff
 	uv run ruff check --fix src tests && uv run ruff format --check src tests
@@ -47,4 +56,4 @@ lint: ## Ruff
 test: ## Tests
 	uv run pytest -q
 
-.PHONY: help setup up down pull data train evaluate pipeline dag export lint test
+.PHONY: help setup up down pull data train evaluate pipeline dag export api load lint test
