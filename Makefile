@@ -10,7 +10,7 @@ IMAGE_API := $(DOCKERHUB_USER)/ride-classifier-api
 IMAGE_WEBAPP := $(DOCKERHUB_USER)/ride-classifier-webapp
 
 help: ## Command list
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 # --- Services ----------------------------------------------------------------
 setup: ## Installs the Python environment (uv sync), once per clone
@@ -107,8 +107,24 @@ e2e: ## End-to-end tests against prod (Kubernetes)
 s3-forward: ## Exposes prod S3 on localhost:8333 (DVC remote) until Ctrl-C. Stop the compose stack first
 	$(KUBECTL) -n $(K8S_NS) port-forward svc/s3 8333:8333
 
-kind-down: ## Drops the cluster (all prod data is lost)
+kind-down: ## Drops the cluster (all prod data is lost). To free RAM, use `make pause` instead
 	kind delete cluster --name $(CLUSTER)
+
+# --- Laptop mode -------------------------------------------------------------------
+pause: ## Frees RAM when not working: stops tunnels, runner, dev stack and the cluster (all data KEPT)
+	-pkill -f "port-forward svc/"
+	-pkill -f Runner.Listener
+	-docker compose down
+	-docker stop $(CLUSTER)-control-plane
+	@echo "Paused. Now quit Docker Desktop to free its memory (resume with: make resume)."
+
+resume: ## Restarts the paused cluster (start Docker Desktop first) and the GitHub runner if installed
+	@docker info > /dev/null 2>&1 || { echo "Docker is not running: start Docker Desktop first."; exit 1; }
+	docker start $(CLUSTER)-control-plane
+	$(KUBECTL) -n $(K8S_NS) rollout status deploy/ride-classifier-api deploy/mlflow --timeout=300s
+	@if [ -x "$$HOME/actions-runner/run.sh" ] && ! pgrep -f Runner.Listener > /dev/null; then \
+	  cd "$$HOME/actions-runner" && nohup ./run.sh > runner.log 2>&1 & echo "GitHub runner started."; fi
+	@echo "Prod is back: API http://localhost:8080/docs, web app http://localhost:8081, MLflow http://localhost:5050"
 
 # --- Monitoring (step 9) ----------------------------------------------------------
 API_URL ?= http://localhost:8080
@@ -135,4 +151,4 @@ test: ## Tests
 
 .PHONY: help setup up monitoring down pull data train evaluate pipeline dag export api webapp load image image-webapp
 .PHONY: app push kind-up k8s-secrets kind-load k8s-deploy k8s-status e2e s3-forward kind-down
-.PHONY: monitoring-forward simulate simulate-unit-bug simulate-dropouts lint test
+.PHONY: pause resume monitoring-forward simulate simulate-unit-bug simulate-dropouts lint test
