@@ -24,11 +24,11 @@ jobs:
       - name: Dependencies
         run: uv sync --locked
 
-      # Ruff runs as a standalone tool (uvx): it does not need to be a project dependency
+      # Whole repo (src, tests, webapp, loadtest, infra). Same ruff version as .pre-commit-config.yaml
       - name: Lint
         run: |
-          uvx ruff@0.17.6 check src tests
-          uvx ruff@0.17.6 format --check src tests
+          uvx ruff@0.17.6 check .
+          uvx ruff@0.17.6 format --check .
 
       - name: Tests
         run: uv run --no-sync pytest -q

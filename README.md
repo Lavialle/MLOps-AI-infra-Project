@@ -14,13 +14,12 @@ deployment and retraining. Monitoring runs on Prometheus and Grafana.
 
 ## Team
 
-| Name | Main area |
-|------|-----------|
-| TBD  | Data & preprocessing |
-| TBD  | Model & MLflow |
-| TBD  | API & web app |
-| TBD  | Docker & Kubernetes |
-| TBD  | CI/CD & monitoring |
+| Name |
+|------|
+| Nicolas Gilhodes |
+| Ange Lavialle |
+| Aymeric Mouttapa |
+| Léon Pejic |
 
 ## What the brief asks, and where it is
 
