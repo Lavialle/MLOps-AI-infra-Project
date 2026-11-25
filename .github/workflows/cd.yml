@@ -65,7 +65,8 @@ jobs:
         if: ${{ env.DOCKERHUB_TOKEN != '' }}
         run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
-      - name: Push images to Docker Hub
+      # The runner is an arm64 Mac: images are rebuilt for amd64 + arm64 so they also run on x86 machines
+      - name: Push multi-arch images to Docker Hub (amd64 + arm64)
         run: make push VERSION=$TAG
 
       - name: Load images into kind
