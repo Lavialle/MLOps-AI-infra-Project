@@ -146,6 +146,19 @@ simulate-dropouts: ## Incident: 20 % of the samples lost by the sensor (alert Se
 infra-env: ## Records hardware, versions and the model/test reference (ai-infrastructure/benchmarks/environment.*)
 	uv run python -m ride_classifier.environment
 
+benchmark: ## Inference benchmark of ./model (threads 4, 1, 8; batches 1/4/16/75 rides) -> benchmarks/raw/*.csv
+	for t in 4 1 8; do uv run python -m ride_classifier.benchmark run --threads $$t; done
+	uv run python -m ride_classifier.benchmark summarize
+
+train-benchmark: ## Training benchmark on the laptop CPU (3 epochs x 3 repeats) -> benchmarks/raw/training.csv
+	uv run python -m ride_classifier.train_benchmark
+	uv run python -m ride_classifier.benchmark summarize --raw ai-infrastructure/benchmarks/raw/training.csv \
+	  --out ai-infrastructure/benchmarks/training-results.csv
+
+colab-bundle: ## colab_bundle.zip for the Colab GPU notebook: train/test splits + model v1 (private, git-ignored)
+	zip -q -r colab_bundle.zip data/processed/train.parquet data/processed/test.parquet model
+	@ls -lh colab_bundle.zip | awk '{print $$NF, $$5}'
+
 infra-diagrams: ## Renders ai-infrastructure/architecture/*.dot to PNG (needs Graphviz: brew install graphviz)
 	for f in ai-infrastructure/architecture/*.dot; do dot -Tpng -Gdpi=150 "$$f" -o "$${f%.dot}.png"; done
 
@@ -158,4 +171,4 @@ test: ## Tests
 
 .PHONY: help setup up monitoring down pull data train evaluate pipeline dag export api webapp load image image-webapp
 .PHONY: app push kind-up k8s-secrets kind-load k8s-deploy k8s-status e2e s3-forward kind-down
-.PHONY: pause resume monitoring-forward simulate simulate-unit-bug simulate-dropouts infra-env infra-diagrams lint test
+.PHONY: pause resume monitoring-forward simulate simulate-unit-bug simulate-dropouts infra-env benchmark train-benchmark colab-bundle infra-diagrams lint test
