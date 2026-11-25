@@ -1,0 +1,15 @@
+experiment,kind,runtime,device,threads,batch_rides,run,metric,value,model_sha,test_sha,commit
+training,measured,pytorch,cpu,4,64,0,data_prep_s,0.32684441696619615,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,0,windows,7833,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,1,s_per_epoch,4.850949389006321,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,1,windows_per_s,1614.7354614236715,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,1,final_loss,0.8005304932594299,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,1,peak_rss_mb,925.203125,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,2,s_per_epoch,4.822600986323475,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,2,windows_per_s,1624.2272628844446,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,2,final_loss,0.8005304932594299,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,2,peak_rss_mb,925.203125,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,3,s_per_epoch,4.585257180655996,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,3,windows_per_s,1708.3011249718738,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,3,final_loss,0.8005304932594299,9499b07b62e76afc,ec00535a372d7a68,cee1af9
+training,measured,pytorch,cpu,4,64,3,peak_rss_mb,925.203125,9499b07b62e76afc,ec00535a372d7a68,cee1af9

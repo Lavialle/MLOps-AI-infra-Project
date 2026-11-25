@@ -1,0 +1,50 @@
+// PROPOSED system (designed, not deployed): see cost-resilience/infrastructure-plan.md.
+// Render: make infra-diagrams
+digraph proposed {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=13, bgcolor="#FCFCFB", pad=0.3, nodesep=0.3, ranksep=0.6,
+         label="Ride classifier: PROPOSED serving system on GCP (designed, not deployed; costs estimated)",
+         labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, color="#46536A", fillcolor="#FFFFFF",
+         penwidth=1.2];
+  edge  [fontname="Helvetica", fontsize=9, color="#46536A", fontcolor="#46536A", arrowsize=0.7];
+
+  users [label="Clients\n(apps, web users)", shape=ellipse, fillcolor="#ECEEF2"];
+  gh    [label="GitHub Actions\nCI + CD (Workload Identity,\nno self-hosted laptop)", fillcolor="#ECEEF2"];
+
+  subgraph cluster_gcp {
+    label="Google Cloud · europe-west1"; style="rounded,filled"; fillcolor="#F2F5FA"; color="#2A78D6";
+    fontcolor="#14213D";
+
+    lb  [label="HTTPS load balancer\n(GKE Ingress)"];
+    ar  [label="Artifact Registry\nAPI + web app images", shape=cylinder];
+
+    subgraph cluster_gke {
+      label="GKE Autopilot · CPU only"; style="rounded,filled"; fillcolor="#FFFFFF"; color="#2A78D6";
+      api  [label="API Deployment\nmin 2 replicas · 1 vCPU / 1 GiB\nPyTorch or ONNX Runtime (step 3)", fillcolor="#DCE8F8"];
+      hpa  [label="HPA\nCPU target 60 %", shape=diamond, fillcolor="#FFFFFF"];
+      web  [label="Web app\n1 replica"];
+    }
+
+    subgraph cluster_ml {
+      label="Training & registry (pay per use)"; style="rounded"; color="#9AA3B2"; fontcolor="#14213D";
+      vertex [label="Vertex AI custom job\n1 GPU, weekly retrain\n(single device: step 4)"];
+      mlflow [label="MLflow server\nCloud Run"];
+      sql    [label="Cloud SQL\nPostgres", shape=cylinder];
+      gcs    [label="Cloud Storage\nDVC data + model artifacts", shape=cylinder];
+    }
+
+    mon [label="Managed Prometheus + Grafana\n4-layer dashboard, 8 alerts, runbooks"];
+  }
+
+  users -> lb -> api;
+  lb -> web -> api;
+  hpa -> api [label="scale 2..N", style=dashed];
+  gh -> ar   [label="build + push :<sha>"];
+  gh -> api  [label="rolling update,\ne2e tests, rollback"];
+  gh -> vertex [label="retrain\n(manual / weekly)"];
+  ar -> api  [style=dashed, label="pull"];
+  vertex -> gcs [label="dvc pull"];
+  vertex -> mlflow [label="run + version,\ngate → @staging"];
+  mlflow -> sql; mlflow -> gcs;
+  mon -> api [label="scrape /metrics"];
+}

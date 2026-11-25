@@ -1,0 +1,7 @@
+experiment,runtime,device,threads,batch_rides,metric,median,runs
+training,pytorch,cpu,4,64,data_prep_s,0.32684441696619615,1
+training,pytorch,cpu,4,64,final_loss,0.8005304932594299,3
+training,pytorch,cpu,4,64,peak_rss_mb,925.203125,3
+training,pytorch,cpu,4,64,s_per_epoch,4.822600986323475,3
+training,pytorch,cpu,4,64,windows,7833.0,1
+training,pytorch,cpu,4,64,windows_per_s,1624.2272628844446,3
