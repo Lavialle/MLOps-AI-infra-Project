@@ -1,0 +1,58 @@
+// Current system (as implemented and measured, not the proposed future system).
+// Render: dot -Tpng -Gdpi=150 current-system.dot -o current-system.png   (make infra-diagrams)
+digraph current {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=13, bgcolor="#FCFCFB", pad=0.3, nodesep=0.25, ranksep=0.55,
+         label="Ride classifier: current system (everything except CI runs on one MacBook Air M2, 8 GB RAM, CPU only)",
+         labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, color="#46536A", fillcolor="#FFFFFF",
+         penwidth=1.2];
+  edge  [fontname="Helvetica", fontsize=9, color="#46536A", fontcolor="#46536A", arrowsize=0.7];
+
+  user   [label="User\n(browser, curl)", shape=ellipse, fillcolor="#ECEEF2"];
+
+  subgraph cluster_github {
+    label="GitHub"; style="rounded"; color="#9AA3B2"; fontcolor="#14213D";
+    repo   [label="Repository\ncode, params.yaml, dvc.lock"];
+    ci     [label="CI (GitHub-hosted, Ubuntu)\nruff + 64 tests"];
+  }
+  hub [label="Docker Hub\nnicogil7/ride-classifier-api (2.5 GB)\nnicogil7/ride-classifier-webapp (1.0 GB)", fillcolor="#ECEEF2"];
+
+  subgraph cluster_laptop {
+    label="MacBook Air M2 · 8 cores · 8 GB RAM · no CUDA GPU"; style="rounded,filled"; fillcolor="#F2F5FA";
+    color="#2A78D6"; fontcolor="#14213D";
+
+    runner [label="Self-hosted GitHub runner\ncd.yml · retrain.yml"];
+    train  [label="Training (CPU, PyTorch)\nmake pipeline / retrain.yml\nsplit → train → evaluate gate"];
+
+    subgraph cluster_docker {
+      label="Docker Desktop VM · 4 GB RAM"; style="rounded"; color="#9AA3B2"; fontcolor="#14213D";
+
+      subgraph cluster_kind {
+        label="kind cluster \"prod\" · namespace ride-classifier"; style="rounded,filled"; fillcolor="#FFFFFF";
+        color="#2A78D6";
+        api     [label="API × 2 (FastAPI)\nmodel v1 baked in · ~550 MB each", fillcolor="#DCE8F8"];
+        web     [label="Web app (Streamlit)\n~140 MB"];
+        mlflow  [label="MLflow server\ntracking + registry · ~450 MB"];
+        pg      [label="Postgres\n(PVC 1 Gi)", shape=cylinder];
+        s3      [label="S3 · SeaweedFS\nbuckets dvc, mlflow (PVC 5 Gi)", shape=cylinder];
+        prom    [label="Prometheus"];
+        graf    [label="Grafana"];
+      }
+      dev [label="docker compose \"dev\"\nsame services, run when kind is stopped", style="rounded,dashed", fillcolor="#FFFFFF"];
+    }
+  }
+
+  user -> web    [label="upload rides"];
+  user -> api    [label="POST /predict\nSwagger"];
+  web  -> api    [label="POST /predict/file"];
+  repo -> ci     [label="push / PR"];
+  repo -> runner [label="merge to main\nmanual / weekly"];
+  runner -> train [label="retrain"];
+  train -> s3    [label="dvc pull"];
+  train -> mlflow [label="params, metrics,\nmodel version"];
+  mlflow -> pg; mlflow -> s3 [label="artifacts"];
+  runner -> hub  [label="build + push\n:<sha>"];
+  runner -> api  [label="kind load, rolling update,\ne2e tests, rollback"];
+  prom -> api    [label="scrape /metrics"];
+  graf -> prom;
+}
