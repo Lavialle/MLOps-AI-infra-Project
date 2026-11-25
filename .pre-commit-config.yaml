@@ -1,0 +1,9 @@
+# Runs on every `git commit` once installed (`make setup` does it).
+# Keep the ruff rev in sync with .github/workflows/ci.yml, so a commit that passes here passes CI.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
