@@ -1,6 +1,6 @@
 # Measurement environment
 
-Recorded 2026-11-25T14:22:24+00:00 at commit `3f8aeb8` by `python -m ride_classifier.environment`.
+Recorded 2026-11-25T15:05:21+00:00 at commit `4774d9f` by `python -m ride_classifier.environment`.
 
 ## Hardware
 

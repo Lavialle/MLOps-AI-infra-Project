@@ -29,3 +29,6 @@ reports/*.png
 
 # Kubernetes credentials (generated from k8s/secrets.example)
 k8s/secrets/
+
+# Colab bundle (contains course data)
+colab_bundle.zip
