@@ -206,3 +206,5 @@ docs/                  data, model, pipeline, api, docker, kubernetes, cicd, mon
 [Data](docs/data.md) · [Model & MLflow](docs/model.md) · [Pipeline](docs/pipeline.md) · [API](docs/api.md) ·
 [Docker](docs/docker.md) · [Kubernetes](docs/kubernetes.md) · [CI/CD](docs/cicd.md) ·
 [Monitoring](docs/monitoring.md) · [Runbooks](docs/runbooks.md) · [Contributing](CONTRIBUTING.md)
+
+**AI Infrastructure contribution** (resource sizing, benchmarks, optimization, distributed training, cost): [ai-infrastructure/](ai-infrastructure/README.md)

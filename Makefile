@@ -142,6 +142,10 @@ simulate-unit-bug: ## Incident: accelerometer sent in g instead of m/s² (alerts
 simulate-dropouts: ## Incident: 20 % of the samples lost by the sensor (alert SensorDropoutsHigh)
 	uv run python -m ride_classifier.simulate --api $(API_URL) --n 50 --dropouts 0.2
 
+# --- AI Infrastructure (ai-infrastructure/) -----------------------------------------
+infra-env: ## Records hardware, versions and the model/test reference (ai-infrastructure/benchmarks/environment.*)
+	uv run python -m ride_classifier.environment
+
 # --- Code quality ---------------------------------------------------------------
 lint: ## Ruff
 	uv run ruff check --fix src tests && uv run ruff format --check src tests
@@ -151,4 +155,4 @@ test: ## Tests
 
 .PHONY: help setup up monitoring down pull data train evaluate pipeline dag export api webapp load image image-webapp
 .PHONY: app push kind-up k8s-secrets kind-load k8s-deploy k8s-status e2e s3-forward kind-down
-.PHONY: pause resume monitoring-forward simulate simulate-unit-bug simulate-dropouts lint test
+.PHONY: pause resume monitoring-forward simulate simulate-unit-bug simulate-dropouts infra-env lint test
