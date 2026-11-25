@@ -29,6 +29,14 @@ from ride_classifier.config import RIDE_ID, ROOT, load_params
 PACKAGES = ["torch", "numpy", "pandas", "pyarrow", "scikit-learn", "mlflow", "fastapi", "onnx", "onnxruntime"]
 
 
+def peak_rss_mb() -> float:
+    """Peak resident memory of this process (ru_maxrss is in bytes on macOS, in KiB on Linux)."""
+    import resource
+
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak / 2**20 if sys.platform == "darwin" else peak / 2**10
+
+
 def sha256(path: Path, chunk: int = 1 << 20) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:

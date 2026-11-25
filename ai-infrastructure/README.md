@@ -15,7 +15,7 @@ distributed-training decision, and a scalable, cost-aware serving design.
 | 0. Setup: rules, reference, environment | `benchmarks/environment.*` | Nicolas Gilhodes | done |
 | 1. Inventory and current architecture | [`architecture/current-system.md`](architecture/current-system.md) | Aymeric Moutappa | done |
 | 2. Baseline benchmark (inference) | [`benchmarks/README.md`](benchmarks/README.md) | Nicolas Gilhodes | done |
-| 3. Optimization (ONNX Runtime) | `optimization/` | Ange Lavialle | to do |
+| 3. Optimization (ONNX Runtime) | [`optimization/README.md`](optimization/README.md) | Ange Lavialle | done: 4.5–10.6× faster, −51 % memory, identical predictions |
 | 4. Training sizing and distributed-training decision | `distributed-training/` | Leon Pejic | to do |
 | 5. Scaling, cost and resilience | `cost-resilience/` | Aymeric Moutappa, Nicolas Gilhodes | to do |
 
