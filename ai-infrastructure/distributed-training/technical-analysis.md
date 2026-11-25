@@ -41,16 +41,21 @@ checkpointing (session 3, part B) would trade compute for memory we don't need.
 
 | Device | Peak memory | Source |
 |--------|-------------|--------|
-| Laptop CPU (M2), process RSS | *pending*: `make train-benchmark` | `training.csv` |
+| Laptop CPU (M2), process RSS | **925 MB** (whole Python process: PyTorch, data, optimizer) | measured 25/11, `training.csv` |
 | Colab T4, `torch.cuda.max_memory_allocated` | *pending*: [`colab_gpu_benchmark.ipynb`](colab_gpu_benchmark.ipynb) | `training-colab` rows |
 
 ## 3. Time: is there anything to parallelise?
 
 | Device | Seconds per epoch (median of 3) | Windows / s | Source |
 |--------|---------------------------------|-------------|--------|
-| Laptop CPU (M2, 4 threads) | *pending* | *pending* | `make train-benchmark` |
+| Laptop CPU (M2, 4 threads) | **4.82 s** (runs: 4.85, 4.82, 4.59) | **1,624** | measured 25/11, `make train-benchmark`, Docker stopped |
 | Colab CPU | *pending* | *pending* | notebook |
 | Colab T4 GPU | *pending* | *pending* | notebook |
+
+On the laptop CPU, a full v1 training run (early stopping at 25 epochs) is about 25 × 4.8 s ≈ **2 min** of
+training steps (*calculated* from the measured epoch time, plus a validation pass per epoch). It is already short
+enough to retrain at every merge. Data preparation (read the train split, fit the scaler, cut 7,833 windows) takes
+**0.33 s** (measured).
 
 **Communication** (*calculated* volume, order-of-magnitude latency): with DDP, every step all-reduces the
 gradients, 37,477 × 4 bytes = **150 KB**, 123 times per epoch. Each all-reduce also pays a fixed
@@ -70,7 +75,8 @@ one GPU.
 
 **When the decision would change:**
 - **Phase B (semi-supervised pre-training on SRV3490):** about 17× more windows (~127k, 0.8 GB) for the same
-  model. The model state stays 0.6 MB, so sharding still has no purpose. Only training time grows, so we
+  model. At the measured 1,624 windows/s, that is about **78 s per epoch on the laptop CPU**, or ~26 min for
+  20 epochs (*calculated*; to be measured). The model state stays 0.6 MB, so sharding still has no purpose. Only training time grows, so we
   re-measure CPU against one GPU, and DDP becomes worth considering only if one GPU takes too long for the
   retraining cadence.
 - **A much larger model** (e.g. a Transformer with hundreds of millions of parameters): the 16 P model-state
