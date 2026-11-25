@@ -32,3 +32,6 @@ k8s/secrets/
 
 # Colab bundle (contains course data)
 colab_bundle.zip
+
+# ONNX exports (derived from ./model by make onnx-export)
+model-onnx/
