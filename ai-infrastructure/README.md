@@ -13,7 +13,7 @@ distributed-training decision, and a scalable, cost-aware serving design.
 | Part | Folder | Suggested owner | Status |
 |------|--------|-----------------|--------|
 | 0. Setup: rules, reference, environment | `benchmarks/environment.*` | Nicolas Gilhodes | done |
-| 1. Inventory and current architecture | `architecture/` | Aymeric Moutappa | to do |
+| 1. Inventory and current architecture | [`architecture/current-system.md`](architecture/current-system.md) | Aymeric Moutappa | done |
 | 2. Baseline benchmark (inference) | `benchmarks/` | Nicolas Gilhodes | to do |
 | 3. Optimization (ONNX Runtime) | `optimization/` | Ange Lavialle | to do |
 | 4. Training sizing and distributed-training decision | `distributed-training/` | Leon Pejic | to do |
