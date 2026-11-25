@@ -70,9 +70,16 @@ image-webapp: ## Builds the web app image: $(IMAGE_WEBAPP):$(VERSION) + :latest
 app: ## Runs API + web app containers with the dev stack (http://localhost:8000/docs, http://localhost:8501)
 	docker compose --profile app up -d
 
-push: ## Pushes both images to Docker Hub (docker login + DOCKERHUB_USER in .env)
-	docker push $(IMAGE_API):$(VERSION) && docker push $(IMAGE_API):latest
-	docker push $(IMAGE_WEBAPP):$(VERSION) && docker push $(IMAGE_WEBAPP):latest
+PLATFORMS ?= linux/amd64,linux/arm64
+BUILDER := ride-classifier-multiarch
+
+# Multi-platform builds need a docker-container builder; the result goes straight to Docker Hub (not loaded locally)
+push: ## Builds both images for amd64 + arm64 and pushes them to Docker Hub (docker login + DOCKERHUB_USER in .env)
+	docker buildx inspect $(BUILDER) > /dev/null 2>&1 || docker buildx create --name $(BUILDER) --driver docker-container
+	docker buildx build --builder $(BUILDER) --platform $(PLATFORMS) --push \
+	  -t $(IMAGE_API):$(VERSION) -t $(IMAGE_API):latest .
+	docker buildx build --builder $(BUILDER) --platform $(PLATFORMS) --push -f docker/webapp/Dockerfile \
+	  -t $(IMAGE_WEBAPP):$(VERSION) -t $(IMAGE_WEBAPP):latest .
 
 # --- Kubernetes "prod" (step 7) ------------------------------------------------
 CLUSTER := ride-classifier

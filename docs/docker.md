@@ -17,8 +17,13 @@ make image          # API image (runs `make export` itself)
 make image-webapp   # web app image
 make app            # docker compose --profile app up -d: API on :8000, web app on :8501
 docker login
-make push           # pushes :<sha> and :latest of both images
+make push           # builds both images for linux/amd64 + linux/arm64 and pushes :<sha> and :latest
 ```
+
+`make image` / `make image-webapp` build for the local architecture only (enough for `make app` and `kind load`).
+`make push` rebuilds with `docker buildx` for both architectures, so the Docker Hub images run on Apple silicon and
+on x86 machines alike. The amd64 half is emulated on an arm64 Mac (QEMU, bundled with Docker Desktop), which
+makes the first push slower.
 
 ## Design choices
 
