@@ -5,6 +5,7 @@
 | [`ci.yml`](../.github/workflows/ci.yml) | GitHub-hosted (ubuntu) | every push and pull request | `uv sync --locked` → ruff lint + format check → pytest (unit + integration; e2e skipped) |
 | [`cd.yml`](../.github/workflows/cd.yml) | **self-hosted** (machine running the kind cluster) | push to `main` (code changes), manual, or called by `retrain.yml` | export `@staging` from prod MLflow → build API + web app images tagged with the commit → push to Docker Hub → `kind load` → rolling update → **end-to-end tests on prod** → automatic `rollout undo` if they fail → clean up old images |
 | [`retrain.yml`](../.github/workflows/retrain.yml) | **self-hosted** | manual (with a reason) or every Monday | `dvc pull` from prod S3 → split → train (prod MLflow) → evaluation gate → `@staging` → calls `cd.yml` |
+| [`publish-images.yml`](../.github/workflows/publish-images.yml) | GitHub-hosted (ubuntu) | push to `main` (code changes), manual | model taken from the published `:latest` API image → build API + web app for **amd64 + arm64** → push `:<sha>` and `:latest` to Docker Hub. Keeps Docker Hub up to date when the self-hosted machine is offline; needs the `DOCKERHUB_TOKEN` secret |
 
 ```
 push / PR ─────────▶ CI (GitHub cloud): lint + tests
@@ -47,7 +48,7 @@ Do this on the Mac that runs the cluster. Keep the runner **outside** iCloud-syn
 
 | Name | Kind | Required | Used for |
 |------|------|----------|----------|
-| `DOCKERHUB_TOKEN` | secret | recommended | `docker login` before pushing (Docker Hub → Account settings → Personal access tokens, scope *Read & Write*). Without it, the runner uses the machine's existing Docker login |
+| `DOCKERHUB_TOKEN` | secret | **yes** for `publish-images.yml`, recommended for `cd.yml` | `docker login` before pushing (Docker Hub → Account settings → Personal access tokens, scope *Read & Write*). Without it, the runner uses the machine's existing Docker login |
 | `DOCKERHUB_USER` | variable | no (default `nicogil7`) | image namespace |
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY` | secrets | no (default: dev values from `k8s/secrets.example`) | DVC access to prod S3 |
 
