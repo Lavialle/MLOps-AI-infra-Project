@@ -1,0 +1,10 @@
+runtime,run,peak_rss_mb,torch_imported,rides
+pytorch,1,504.328125,True,75
+pytorch,2,588.6875,True,75
+pytorch,3,581.640625,True,75
+onnxruntime,1,286.90625,False,75
+onnxruntime,2,286.65625,False,75
+onnxruntime,3,288.390625,False,75
+onnxruntime-int8,1,316.125,False,75
+onnxruntime-int8,2,314.59375,False,75
+onnxruntime-int8,3,315.53125,False,75

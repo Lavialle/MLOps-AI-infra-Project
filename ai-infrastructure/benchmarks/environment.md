@@ -1,6 +1,6 @@
 # Measurement environment
 
-Recorded 2026-11-25T15:05:21+00:00 at commit `4774d9f` by `python -m ride_classifier.environment`.
+Recorded 2026-11-25T16:16:18+00:00 at commit `3ada64b` by `python -m ride_classifier.environment`.
 
 ## Hardware
 
@@ -33,8 +33,8 @@ Recorded 2026-11-25T15:05:21+00:00 at commit `4774d9f` by `python -m ride_classi
 | scikit-learn | 1.9.1 |
 | mlflow | 3.18.0 |
 | fastapi | 0.165.0 |
-| onnx | – |
-| onnxruntime | – |
+| onnx | 1.23.2 |
+| onnxruntime | 1.32.0 |
 
 ## Reference
 

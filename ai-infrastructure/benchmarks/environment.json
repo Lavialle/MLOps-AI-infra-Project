@@ -1,6 +1,6 @@
 {
-  "recorded_at": "2026-11-25T15:05:21+00:00",
-  "git_commit": "4774d9f",
+  "recorded_at": "2026-11-25T16:16:18+00:00",
+  "git_commit": "3ada64b",
   "hardware": {
     "os": "Darwin 26.6.2",
     "arch": "arm64",
@@ -23,8 +23,8 @@
     "scikit-learn": "1.9.1",
     "mlflow": "3.18.0",
     "fastapi": "0.165.0",
-    "onnx": null,
-    "onnxruntime": null
+    "onnx": "1.23.2",
+    "onnxruntime": "1.32.0"
   },
   "reference": {
     "model_name": "ride-classifier",

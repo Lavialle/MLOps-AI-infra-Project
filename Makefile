@@ -150,6 +150,15 @@ benchmark: ## Inference benchmark of ./model (threads 4, 1, 8; batches 1/4/16/75
 	for t in 4 1 8; do uv run python -m ride_classifier.benchmark run --threads $$t; done
 	uv run python -m ride_classifier.benchmark summarize
 
+onnx: ## Step 3: export ./model to ONNX (fp32 + int8), benchmark both (threads 4, 1), serving memory per runtime
+	uv run python -m ride_classifier.optimize export
+	for t in 4 1; do for r in onnxruntime onnxruntime-int8; do \
+	  uv run python -m ride_classifier.benchmark run --runtime $$r --threads $$t --experiment onnx-inference \
+	    --out ai-infrastructure/optimization/raw/onnx-inference.csv; done; done
+	uv run python -m ride_classifier.optimize memory --threads 1
+	uv run python -m ride_classifier.benchmark summarize --raw ai-infrastructure/optimization/raw/onnx-inference.csv \
+	  --out ai-infrastructure/optimization/onnx-results.csv
+
 train-benchmark: ## Training benchmark on the laptop CPU (3 epochs x 3 repeats) -> benchmarks/raw/training.csv
 	uv run python -m ride_classifier.train_benchmark
 	uv run python -m ride_classifier.benchmark summarize --raw ai-infrastructure/benchmarks/raw/training.csv \
@@ -171,4 +180,5 @@ test: ## Tests
 
 .PHONY: help setup up monitoring down pull data train evaluate pipeline dag export api webapp load image image-webapp
 .PHONY: app push kind-up k8s-secrets kind-load k8s-deploy k8s-status e2e s3-forward kind-down
-.PHONY: pause resume monitoring-forward simulate simulate-unit-bug simulate-dropouts infra-env benchmark train-benchmark colab-bundle infra-diagrams lint test
+.PHONY: pause resume monitoring-forward simulate simulate-unit-bug simulate-dropouts lint test
+.PHONY: infra-env benchmark onnx train-benchmark colab-bundle infra-diagrams

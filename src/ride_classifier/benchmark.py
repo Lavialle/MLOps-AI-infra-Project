@@ -8,7 +8,7 @@ What one "request" does is exactly what the API does for a call: the same functi
 RideClassifier.predict (checked at startup), timed in three phases:
 
     preprocessing   gap filling + scaling + windowing         (pandas / NumPy)
-    network         CNN forward pass on all windows, softmax   (the "runner": PyTorch here, ONNX Runtime in step 3)
+    network         CNN forward pass on all windows, softmax   (the "runner": PyTorch, or ONNX Runtime with --runtime)
     aggregation     mean of the window probabilities per ride
 
 Protocol (ai-infrastructure/README.md): fixed model and test split (hashes from environment.json),
@@ -20,8 +20,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import resource
-import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -33,7 +31,7 @@ import torch
 
 from ride_classifier.config import CLASSES, RIDE_ID, ROOT, load_params
 from ride_classifier.data import fill_gaps
-from ride_classifier.environment import collect
+from ride_classifier.environment import collect, peak_rss_mb
 from ride_classifier.features import ChannelScaler, aggregate_by_ride, make_windows
 from ride_classifier.model import INPUT_COLUMNS, ride_scores
 
@@ -44,12 +42,6 @@ RAW_COLUMNS = [
 ]  # fmt: skip
 
 Runner = Callable[[np.ndarray], np.ndarray]  # windows (n, 6, 256) float32 -> probabilities (n, 5)
-
-
-def peak_rss_mb() -> float:
-    """Peak resident memory of this process (ru_maxrss is in bytes on macOS, in KiB on Linux)."""
-    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    return peak / 2**20 if sys.platform == "darwin" else peak / 2**10
 
 
 def pytorch_runner(net: torch.nn.Module, device: str = "cpu", batch_windows: int = 512) -> Runner:
@@ -153,24 +145,45 @@ def check_equivalence(wrapper, pipeline: Pipeline, test: pd.DataFrame) -> None:
     assert ours["prediction"].tolist() == served["prediction"].tolist()
 
 
+def parity(ours: pd.DataFrame, served: pd.DataFrame) -> dict[str, float]:
+    """How far an optimized runtime is from the served PyTorch model, on every test ride."""
+    a = ours.set_index(RIDE_ID).loc[served[RIDE_ID]]
+    return {
+        "max_abs_diff_vs_pytorch": float(np.abs(a[CLASSES].to_numpy() - served[CLASSES].to_numpy()).max()),
+        "agreement_vs_pytorch": float((a["prediction"].to_numpy() == served["prediction"].to_numpy()).mean()),
+    }
+
+
+def make_pipeline(args, wrapper) -> Pipeline:
+    """Same pipeline, network runner chosen by --runtime (ONNX files from `optimize export`)."""
+    if args.runtime == "pytorch":
+        torch.set_num_threads(args.threads)
+        return Pipeline(wrapper, pytorch_runner(wrapper.net, args.device))
+    from ride_classifier.optimize import RUNTIMES, onnx_runner
+
+    path = Path(args.onnx_dir) / RUNTIMES[args.runtime]
+    if not path.exists():
+        raise SystemExit(f"{path} missing: run `python -m ride_classifier.optimize export` first")
+    return Pipeline(wrapper, onnx_runner(path, args.threads))
+
+
 def run(args) -> Path:
-    torch.set_num_threads(args.threads)
     test_path = Path(args.test)
     env = collect(Path(args.model), test_path)
     ref = env["reference"]
 
     t0 = time.perf_counter()
     wrapper = mlflow.pyfunc.load_model(args.model).unwrap_python_model()
+    pipeline = make_pipeline(args, wrapper)
     load_s = time.perf_counter() - t0
-    if args.runtime != "pytorch":
-        raise SystemExit(f"runtime {args.runtime!r} not available yet (step 3 adds onnxruntime)")
-    pipeline = Pipeline(wrapper, pytorch_runner(wrapper.net, args.device))
     rss_after_load = peak_rss_mb()
 
     test = pd.read_parquet(test_path)
-    check_equivalence(wrapper, pipeline, test)
+    served = wrapper.predict(None, test[INPUT_COLUMNS])  # the reference: PyTorch, as in production
+    if args.runtime == "pytorch":
+        check_equivalence(wrapper, pipeline, test)
     pred, _ = pipeline(test)  # quality on the whole test split, through the benchmarked pipeline
-    quality = ride_scores(test, pred, "test")
+    quality = {**ride_scores(test, pred, "test"), **parity(pred, served)}
 
     print(f"{args.runtime} on {args.device}, {args.threads} thread(s), model v{ref['model_version']}:")
     rows = benchmark(pipeline, test, args.batches, args.repeats, args.warmup, args.min_requests)
@@ -180,6 +193,8 @@ def run(args) -> Path:
         "peak_rss_mb": peak_rss_mb(),
         "macro_f1": quality["test_macro_f1"],
         "accuracy": quality["test_accuracy"],
+        "max_abs_diff_vs_pytorch": quality["max_abs_diff_vs_pytorch"],
+        "agreement_vs_pytorch": quality["agreement_vs_pytorch"],
     }
     rows += [{"batch_rides": 0, "run": 0, "metric": k, "value": float(v)} for k, v in once.items()]
     print(f"  load {load_s:.2f} s, peak RSS {once['peak_rss_mb']:.0f} MB, macro F1 {once['macro_f1']:.3f}")
@@ -228,7 +243,8 @@ def main() -> None:
     r = sub.add_parser("run", help="run the benchmark and append raw rows")
     r.add_argument("--model", default=str(ROOT / "model"))
     r.add_argument("--test", default=str(ROOT / load_params()["data"]["test_path"]))
-    r.add_argument("--runtime", default="pytorch", choices=["pytorch", "onnxruntime"])
+    r.add_argument("--runtime", default="pytorch", choices=["pytorch", "onnxruntime", "onnxruntime-int8"])
+    r.add_argument("--onnx-dir", default=str(ROOT / "model-onnx"), help="ONNX files from `optimize export`")
     r.add_argument("--device", default="cpu", choices=["cpu", "cuda"])
     r.add_argument("--threads", type=int, default=torch.get_num_threads())
     r.add_argument("--batches", type=int, nargs="+", default=[1, 4, 16, 75], help="rides per request")
