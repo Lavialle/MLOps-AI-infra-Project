@@ -1,0 +1,87 @@
+name: Publish images (Docker Hub, amd64 + arm64)
+
+# Publishes the API and web app images from GitHub's cloud runners, so Docker Hub stays up to date
+# even when the self-hosted machine (cd.yml) is offline.
+#
+# The model baked into the API image is taken from the API image already on Docker Hub (:latest):
+# prod MLflow is local to the kind cluster and unreachable from here. A NEW model still goes through
+# retrain.yml + cd.yml, which export @staging from prod MLflow.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**.md"]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-images
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOCKERHUB_USER: ${{ vars.DOCKERHUB_USER || 'nicogil7' }}
+  PLATFORMS: linux/amd64,linux/arm64
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag of this build
+        run: echo "TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-qemu-action@v3 # arm64 emulation on the amd64 runner
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # The model files (MLmodel, weights) do not depend on the CPU architecture: any platform of the image works
+      - name: Model from the published API image
+        run: |
+          docker create --platform linux/arm64 --name model-src "$DOCKERHUB_USER/ride-classifier-api:latest"
+          docker cp model-src:/app/model ./model
+          docker rm model-src
+          cat model/model_meta.json
+
+      - name: API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_USER }}/ride-classifier-api:${{ env.TAG }}
+            ${{ env.DOCKERHUB_USER }}/ride-classifier-api:latest
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Web app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/webapp/Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_USER }}/ride-classifier-webapp:${{ env.TAG }}
+            ${{ env.DOCKERHUB_USER }}/ride-classifier-webapp:latest
+          cache-from: type=gha,scope=webapp
+          cache-to: type=gha,scope=webapp,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Images \`$TAG\` published (model v$(python3 -c 'import json; print(json.load(open("model/model_meta.json")).get("version", "?"))'))"
+            for image in api webapp; do
+              echo '```'
+              docker buildx imagetools inspect "$DOCKERHUB_USER/ride-classifier-$image:$TAG" | grep -E '^Name|Platform'
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
