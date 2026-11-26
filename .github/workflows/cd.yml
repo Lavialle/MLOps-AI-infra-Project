@@ -28,7 +28,7 @@ env:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, macOS]
+    runs-on: [self-hosted, ride-classifier] # any machine hosting the kind cluster (custom runner label)
     timeout-minutes: 45
     # Optional manual approval: Settings > Environments > production > Required reviewers
     environment: production
@@ -65,7 +65,7 @@ jobs:
         if: ${{ env.DOCKERHUB_TOKEN != '' }}
         run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
-      # The runner is an arm64 Mac: images are rebuilt for amd64 + arm64 so they also run on x86 machines
+      # Images are rebuilt for amd64 + arm64 whatever the runner architecture, so they run on Macs and PCs alike
       - name: Push multi-arch images to Docker Hub (amd64 + arm64)
         run: make push VERSION=$TAG
 

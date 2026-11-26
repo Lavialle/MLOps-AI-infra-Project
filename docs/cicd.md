@@ -26,17 +26,19 @@ Require approval for all outside collaborators*.
 
 ## Setting up the runner (once)
 
-Do this on the Mac that runs the cluster. Keep the runner **outside** iCloud-synced folders such as Desktop or Documents.
+Do this on the machine that runs the cluster (macOS, Linux or WSL2). On a Mac, keep the runner **outside**
+iCloud-synced folders such as Desktop or Documents. `cd.yml` and `retrain.yml` select the runner by the custom
+label **`ride-classifier`**, not by OS: moving prod to another machine only means registering a runner there.
 
-1. GitHub → repository **Settings → Actions → Runners → New self-hosted runner** → macOS, ARM64.
+1. GitHub → repository **Settings → Actions → Runners → New self-hosted runner** → your OS and architecture.
 2. Run the commands GitHub shows, in `~/actions-runner`:
    ```bash
    mkdir -p ~/actions-runner && cd ~/actions-runner
-   # curl -o actions-runner-osx-arm64-<version>.tar.gz -L <url shown by GitHub>
-   # tar xzf ./actions-runner-osx-arm64-<version>.tar.gz
-   ./config.sh --url https://github.com/<owner>/MLOps-AI-infra-Project --token <token shown by GitHub>
+   # curl -o actions-runner-<os>-<arch>-<version>.tar.gz -L <url shown by GitHub>
+   # tar xzf ./actions-runner-<os>-<arch>-<version>.tar.gz
+   ./config.sh --url https://github.com/<owner>/MLOps-AI-infra-Project --token <token shown by GitHub> \
+     --labels ride-classifier
    ```
-   Accept the default labels (`self-hosted`, `macOS`, `ARM64`).
 3. Start it from a terminal where `uv`, `docker`, `kind` and `kubectl` are on the `PATH`:
    ```bash
    ./run.sh                     # foreground, or:

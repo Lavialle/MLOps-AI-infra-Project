@@ -1,7 +1,7 @@
 # Ride Classifier: MLOps & AI Infrastructure Project
 
-[![CI](https://github.com/ngilhodes-netizen/MLOps-AI-infra-Project/actions/workflows/ci.yml/badge.svg)](https://github.com/ngilhodes-netizen/MLOps-AI-infra-Project/actions/workflows/ci.yml)
-[![CD](https://github.com/ngilhodes-netizen/MLOps-AI-infra-Project/actions/workflows/cd.yml/badge.svg)](https://github.com/ngilhodes-netizen/MLOps-AI-infra-Project/actions/workflows/cd.yml)
+[![CI](https://github.com/Lavialle/MLOps-AI-infra-Project/actions/workflows/ci.yml/badge.svg)](https://github.com/Lavialle/MLOps-AI-infra-Project/actions/workflows/ci.yml)
+[![CD](https://github.com/Lavialle/MLOps-AI-infra-Project/actions/workflows/cd.yml/badge.svg)](https://github.com/Lavialle/MLOps-AI-infra-Project/actions/workflows/cd.yml)
 
 End-to-end MLOps pipeline that classifies a bike ride into **Safe**, **Safe overall**, **Bad weather**, **Tandem**
 or **Reckless** from its IMU time series (accelerometer `ax, ay, az`, gyroscope `rx, ry, rz`, 10 Hz).
