@@ -72,7 +72,7 @@ flowchart LR
 ```
 
 The training pipeline is a DVC DAG: `raw data (DVC) → split (by ride) → train (MLflow run + new version) →
-evaluation gate (test split) → @staging → export → API image`.
+5-fold cross-validation → evaluation gate → @staging → export → API image`.
 
 | Component | Dev (docker compose) | Prod (kind) |
 |-----------|----------------------|-------------|
@@ -93,7 +93,7 @@ Prerequisites: [uv](https://docs.astral.sh/uv/), Docker Desktop, [kind](https://
 make setup                 # Python 3.14 env (uv) + .env
 make up                    # S3, Postgres, MLflow, Prometheus, Grafana
 make pull                  # dvc pull: raw data from S3
-make pipeline              # dvc repro: split -> train -> evaluate (promotes @staging if the gate passes)
+make pipeline              # dvc repro: split -> train, cv -> evaluate (promotes @staging if the gate passes)
 make export && make api    # API on http://localhost:8000/docs
 make webapp                # web app on http://localhost:8501 (other terminal)
 make test                  # unit + integration tests
@@ -116,10 +116,11 @@ After the first deployment, **GitHub Actions** handles everything:
 
 **Model** (ride level; the baseline always predicts "Safe"):
 
-| Split (75 rides) | Macro F1 | Balanced accuracy | Accuracy |
-|------------------|----------|-------------------|----------|
-| Validation (best epoch 13) | **0.604** | 0.638 | 0.787 |
-| Test (evaluation gate) | **0.329** | 0.331 | 0.733 |
+| Split | Macro F1 | Balanced accuracy | Accuracy |
+|-------|----------|-------------------|----------|
+| Validation, 75 rides (best epoch 13) | **0.604** | 0.638 | 0.787 |
+| Test (frozen split, 75 rides) | **0.329** | 0.331 | 0.733 |
+| 5-fold CV, 500 rides (evaluation gate) | **0.371 ± 0.089** | 0.457 ± 0.148 | 0.654 ± 0.069 |
 | Majority baseline | 0.181 | 0.200 | 0.827 |
 
 Latest prod run (x86 laptop, [`reports/`](reports/)): this model is served in prod and baked into the Docker Hub
@@ -131,10 +132,11 @@ The model clearly beats the baseline on the imbalance-aware metrics (macro F1, b
 accuracy only reflects the 83 % share of Safe rides. Val and test hold a single Reckless ride each, so per-class
 scores are noisy.
 
-**5-fold cross-validation by ride** (`make cv`, all 500 rides tested once, [details](docs/model.md#cross-validation-how-noisy-is-the-gate)):
-macro F1 **0.323 ± 0.076** (baseline 0.182), balanced accuracy 0.445 ± 0.126, Reckless recall 3/6. The model beats the
-baseline in every fold, but the gate floor of 0.30 passes on only 3 folds out of 5: it sits inside the noise of a
-75-ride test split. Next steps: set the gate from the cross-validated scores, then data augmentation.
+**5-fold cross-validation by ride** (`make cv`, all 500 rides tested once, [details](docs/model.md#cross-validation-how-noisy-is-one-test-split)):
+macro F1 **0.371 ± 0.089** (baseline 0.182), balanced accuracy 0.457 ± 0.148, Reckless recall 3/6. Fold scores range
+from 0.24 to 0.44: one 75-ride split is too noisy to judge a model, so the **evaluation gate now uses the
+cross-validated mean** (≥ 0.25, baseline beaten in every fold) plus a sanity check of the promoted version on the
+frozen test split. Next modelling step: data augmentation.
 
 **Serving** (one process, laptop): `/predict` handles 16.5 rides/s with a P95 of 340 ms and 0 failures in a
 1-minute Locust test (20 users). The whole test split (75 rides) goes through `/predict/file` in 1.1 s.
@@ -160,7 +162,7 @@ baseline in every fold, but the gate floor of 0.30 passes on only 3 folds out of
 |--------|-----|
 | **Split by ride, stratified, ≥ 1 ride of each class per split** | Windows of one ride are correlated, so splitting by row would leak. With 6 Reckless rides, a random split often leaves val or test without any |
 | **1D-CNN on 25.6 s windows, mean of window probabilities per ride** | Rides have 1,800 to 4,800 samples: windows give more training examples and a fixed input size. Global average pooling makes the network accept any length |
-| **Class-weighted loss, early stopping and gate on macro F1** | 83 % of rides are Safe, so accuracy is meaningless. The gate requires macro F1 above a floor **and** above the majority baseline |
+| **Class-weighted loss, early stopping and gate on macro F1** | 83 % of rides are Safe, so accuracy is meaningless. The gate requires a **cross-validated** mean macro F1 above a floor, the majority baseline beaten in every fold, and on the frozen test split for the promoted version |
 | **One MLflow pyfunc = preprocessing + model** | Gap filling, the scaler fitted on train, windowing and aggregation travel with the weights, so serving cannot drift from training |
 | **Model baked into the API image** | A tagged image is a frozen, reproducible model. Pods never depend on MLflow at runtime, and rolling back the model means rolling back the image |
 | **SeaweedFS instead of MinIO** | MinIO stopped publishing images (`minio/minio` is gone from Docker Hub, Quay refuses anonymous pulls). SeaweedFS is the S3 store of the course labs, and all code speaks plain S3 (boto3, DVC, MLflow) |

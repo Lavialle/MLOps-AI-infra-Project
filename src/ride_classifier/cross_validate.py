@@ -5,7 +5,7 @@
 
 Every ride is tested exactly once (all 6 Reckless rides instead of 1). In each fold, part of the remaining rides is
 held out for early stopping, as in the pipeline. Same params.yaml as the served model.
-Measurement only: no MLflow run, no promotion; the frozen split, the gate and the served model are untouched.
+No MLflow run and no promotion here: the evaluation gate (ride_classifier.evaluate) reads reports/cv.json.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def ride_folds(labels: pd.DataFrame, k: int, val_share: float, seed: int) -> lis
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--folds", type=int, default=5)
+    parser.add_argument("--folds", type=int, default=load_params()["gate"]["cv_folds"])
     parser.add_argument("--device", default="cpu", choices=["cpu", "cuda", "mps"])
     args = parser.parse_args()
 
@@ -81,7 +81,7 @@ def main() -> None:
 
     table = pd.DataFrame(per_fold)
     all_pred = pd.concat(preds, ignore_index=True)
-    gate = params["gate"]["min_macro_f1"]
+    gate = params["gate"]["min_cv_macro_f1"]
     result = {
         "folds": args.folds,
         "device": args.device,
@@ -89,10 +89,9 @@ def main() -> None:
         "mean": {f"test_{m}": float(table[f"test_{m}"].mean()) for m in HEADLINE},
         "std": {f"test_{m}": float(table[f"test_{m}"].std(ddof=1)) for m in HEADLINE},
         "baseline_mean_macro_f1": float(table["test_baseline_macro_f1"].mean()),
-        "folds_passing_gate": int(
-            ((table["test_macro_f1"] >= gate) & (table["test_macro_f1"] > table["test_baseline_macro_f1"])).sum()
-        ),
-        "gate_min_macro_f1": gate,
+        "folds_beating_baseline": int((table["test_macro_f1"] > table["test_baseline_macro_f1"]).sum()),
+        "folds_above_floor": int((table["test_macro_f1"] >= gate).sum()),
+        "gate_min_cv_macro_f1": gate,
         # every ride predicted once, by the model that did not see it: per-class recall over all 500 rides
         "pooled": ride_scores(df, all_pred, "cv"),
         "pooled_confusion": confusion(df, all_pred),
@@ -105,7 +104,8 @@ def main() -> None:
     print(
         f"\n{args.folds}-fold CV: macro F1 {m['test_macro_f1']:.3f} ± {s['test_macro_f1']:.3f} "
         f"(baseline {result['baseline_mean_macro_f1']:.3f}), balanced acc {m['test_balanced_accuracy']:.3f} "
-        f"± {s['test_balanced_accuracy']:.3f}; gate passed on {result['folds_passing_gate']}/{args.folds} folds"
+        f"± {s['test_balanced_accuracy']:.3f}; "
+        f"beats the baseline on {result['folds_beating_baseline']}/{args.folds} folds"
     )
     recalls = {c: round(result["pooled"][f"cv_recall_{c.lower().replace(' ', '_')}"], 3) for c in CLASSES}
     print(f"pooled recall per class: {recalls}\n-> {OUT.relative_to(ROOT)}")

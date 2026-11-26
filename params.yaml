@@ -25,4 +25,6 @@ train:
   random_state: 42
 
 gate:
-  min_macro_f1: 0.30    # must beat the majority-class baseline (macro F1 ~ 0.18). Calibrate after the first run.
+  cv_folds: 5             # stratified k-fold BY RIDE (ride_classifier.cross_validate): every ride tested once
+  min_cv_macro_f1: 0.25   # floor on the CV mean: measured 0.32-0.37 (GPU, CPU), minus ~2 standard errors (std / sqrt 5)
+  # also required: beat the majority baseline in EVERY fold, and on the frozen test split for the version promoted

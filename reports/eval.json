@@ -17,6 +17,10 @@
   "test_baseline_recall_bad_weather": 0.0,
   "test_baseline_recall_tandem": 0.0,
   "test_baseline_recall_reckless": 0.0,
-  "gate_min_macro_f1": 0.3,
+  "cv_mean_macro_f1": 0.3709941259031145,
+  "cv_std_macro_f1": 0.08923335680947383,
+  "cv_folds_beating_baseline": 5,
+  "gate_cv_folds": 5,
+  "gate_min_cv_macro_f1": 0.25,
   "passed": true
 }

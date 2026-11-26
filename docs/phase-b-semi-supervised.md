@@ -30,7 +30,7 @@ CPU-vs-GPU and single-vs-multi-GPU question (step 4).
 
 1. **No test or validation ride in pre-training.** Before using SRV3490, check that no ride id (and no identical
    signal) overlaps with GBG500's validation and test splits. Unlabelled data from test rides would still leak.
-2. **Same frozen test split, same gate** as v1 (macro F1 ≥ 0.30 and above the baseline). Phase B only reaches
+2. **Same frozen test split, same gate** as v1 (cross-validated mean macro F1 ≥ 0.25, baseline beaten in every fold and on the test split). Phase B only reaches
    production if v2 beats v1 on it.
 3. **Variance:** 1 Reckless ride in the test split makes one number fragile. Report 5-fold cross-validation by
    ride (mean ± std) for both v1 and v2 next to the test score.
