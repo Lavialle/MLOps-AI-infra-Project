@@ -1,0 +1,5 @@
+config,repeat,threads_in_pod,periods_before,throttled_before,throttled_us_before,periods_after,throttled_after,throttled_us_after
+default,1,8,17837,41,15160652,20100,500,41647216
+default,2,8,20329,508,42955330,22558,975,71026365
+omp1,1,1,401,9,55082,2594,325,12523631
+omp1,2,1,2817,326,12536844,4989,701,30162229

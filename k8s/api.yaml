@@ -28,6 +28,11 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
+          # torch would start one thread per node core inside a 1-CPU limit: measured throttling -45 %
+          # (ai-infrastructure/optimization/README.md). Keep equal to limits.cpu.
+          env:
+            - name: OMP_NUM_THREADS
+              value: "1"
           # readiness: traffic only once the model is loaded (/ready = 503 before).
           readinessProbe:
             httpGet: {path: /ready, port: 8000}
