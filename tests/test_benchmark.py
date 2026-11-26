@@ -5,6 +5,7 @@ from argparse import Namespace
 import mlflow
 import pandas as pd
 import pytest
+from conftest import make_fake_rides
 
 from ride_classifier.benchmark import (
     Pipeline,
@@ -67,3 +68,13 @@ def test_summary_refuses_to_mix_models(model_dir, test_file, tmp_path):
     raw.to_csv(out, index=False)
     with pytest.raises(SystemExit, match="not comparable"):
         summarize(out)
+
+
+def test_pytorch_runner_leaves_the_served_model_on_its_device(model_dir):
+    # On CUDA the runner must not move the served network: the CPU reference predictions would break.
+
+    wrapper = mlflow.pyfunc.load_model(str(model_dir)).unwrap_python_model()
+    pytorch_runner(wrapper.net, device="meta")  # "meta": a device available everywhere, like cuda for this purpose
+    assert all(p.device.type == "cpu" for p in wrapper.net.parameters())
+    rides = make_fake_rides(1, seed=3)[0]
+    assert len(wrapper.predict(None, rides)) == rides["ride_id"].nunique()

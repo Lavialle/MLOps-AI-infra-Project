@@ -19,6 +19,7 @@ medians reported by `summarize`. Quality is measured too: macro F1 on the whole 
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import time
 from collections.abc import Callable
@@ -45,8 +46,12 @@ Runner = Callable[[np.ndarray], np.ndarray]  # windows (n, 6, 256) float32 -> pr
 
 
 def pytorch_runner(net: torch.nn.Module, device: str = "cpu", batch_windows: int = 512) -> Runner:
-    """The serving runtime of v1: eager PyTorch, inference mode, softmax."""
-    net = net.to(device).eval()
+    """The serving runtime of v1: eager PyTorch, inference mode, softmax.
+
+    Works on a COPY of the network: moving the served model itself to the GPU would break the CPU
+    reference predictions (wrapper.predict) used for the parity check.
+    """
+    net = copy.deepcopy(net).to(device).eval()
 
     @torch.inference_mode()
     def run(X: np.ndarray) -> np.ndarray:
@@ -180,8 +185,8 @@ def run(args) -> Path:
 
     test = pd.read_parquet(test_path)
     served = wrapper.predict(None, test[INPUT_COLUMNS])  # the reference: PyTorch, as in production
-    if args.runtime == "pytorch":
-        check_equivalence(wrapper, pipeline, test)
+    if args.runtime == "pytorch" and args.device == "cpu":
+        check_equivalence(wrapper, pipeline, test)  # exact on CPU; GPU arithmetic differs in the last digits
     pred, _ = pipeline(test)  # quality on the whole test split, through the benchmarked pipeline
     quality = {**ride_scores(test, pred, "test"), **parity(pred, served)}
 
