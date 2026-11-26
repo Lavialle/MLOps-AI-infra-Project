@@ -34,7 +34,7 @@ deployment and retraining. Monitoring runs on Prometheus and Grafana.
 | 6. Docker + Kubernetes via GitHub Actions (self-hosted runner) | Images on Docker Hub, local **kind** cluster, `cd.yml` on a self-hosted runner: [docs/docker.md](docs/docker.md), [docs/kubernetes.md](docs/kubernetes.md), [docs/cicd.md](docs/cicd.md) |
 | 7. Versioned and documented on GitHub | One PR per step, CI on every PR, `docs/` |
 | Pipeline DAG | **DVC** pipeline `split → train → evaluate`: [`dvc.yaml`](dvc.yaml), [docs/pipeline.md](docs/pipeline.md) |
-| Tests | 62 unit + integration tests (CI) and 5 end-to-end tests run against prod after each deployment: [`tests/`](tests/) |
+| Tests | 73 unit + integration tests (CI) and 5 end-to-end tests run against prod after each deployment: [`tests/`](tests/) |
 | **Bonus 1** Retraining pipeline | [`retrain.yml`](.github/workflows/retrain.yml): DVC pull → train → gate → promote → redeploy |
 | **Bonus 2** Monitoring | **Prometheus + Grafana**, 4-layer dashboard, 8 alerts with runbooks: [docs/monitoring.md](docs/monitoring.md) |
 
@@ -122,9 +122,10 @@ After the first deployment, **GitHub Actions** handles everything:
 | Test (evaluation gate) | **0.329** | 0.331 | 0.733 |
 | Majority baseline | 0.181 | 0.200 | 0.827 |
 
-Latest prod run (x86 laptop, [`reports/`](reports/)). The model baked into the Docker Hub image and used as the fixed
-reference in [`ai-infrastructure/`](ai-infrastructure/) is the first v1, trained on an Apple M2: test macro F1
-**0.317**, balanced accuracy 0.458 (validation 0.567, best epoch 17).
+Latest prod run (x86 laptop, [`reports/`](reports/)): this model is served in prod and baked into the Docker Hub
+images since the CD run of 26/11 (tag `6439b08` and `latest`). The fixed reference of
+[`ai-infrastructure/`](ai-infrastructure/) is the first v1, trained on an Apple M2: test macro F1 **0.317**,
+balanced accuracy 0.458 (validation 0.567, best epoch 17).
 
 The model clearly beats the baseline on the imbalance-aware metrics (macro F1, balanced accuracy). The baseline's
 accuracy only reflects the 83 % share of Safe rides. Val and test hold a single Reckless ride each, so per-class
@@ -200,7 +201,7 @@ Dockerfile, docker/    API image, web app image, MLflow server image
 k8s/                   prod manifests (kustomize)
 infra/                 S3 and monitoring configs (shared by dev and prod)
 tests/                 unit, integration, end-to-end
-.github/workflows/     ci.yml, cd.yml, retrain.yml
+.github/workflows/     ci.yml, cd.yml, retrain.yml, publish-images.yml
 docs/                  data, model, pipeline, api, docker, kubernetes, cicd, monitoring, runbooks
 ```
 

@@ -2,8 +2,8 @@
 
 **Decision: train on a single device. DDP, FSDP and ZeRO are not justified for this workload.** The arguments
 below are labelled *calculated* (a formula from the course) or *measured* (raw rows in
-[`../benchmarks/raw/training.csv`](../benchmarks/raw/)). A measured value marked "pending" has not been run yet,
-and no number replaces it.
+[`../benchmarks/raw/`](../benchmarks/raw/): `training.csv`, `training-x86.csv`, `training-gpu.csv`). A measured
+value marked "pending" has not been run yet, and no number replaces it.
 
 ## 1. The workload
 
@@ -42,7 +42,9 @@ checkpointing (session 3, part B) would trade compute for memory we don't need.
 | Device | Peak memory | Source |
 |--------|-------------|--------|
 | Laptop CPU (M2), process RSS | **925 MB** (whole Python process: PyTorch, data, optimizer) | measured 25/11, `training.csv` |
-| Colab T4, `torch.cuda.max_memory_allocated` | *pending*: [`colab_gpu_benchmark.ipynb`](colab_gpu_benchmark.ipynb) | `training-colab` rows |
+| Laptop GPU (RTX 3060, 6 GB), `torch.cuda.max_memory_allocated` | **27 MB** (weights, gradients, Adam states, activations of a batch of 64): **0.4 %** of the GPU | measured 26/11, [`raw/training-gpu.csv`](../benchmarks/raw/training-gpu.csv) |
+| Same run, process RSS | 2,101 MB (CUDA libraries and context, not the model) | same run |
+| Colab T4 | not run: a local GPU was measured instead; notebook kept: [`colab_gpu_benchmark.ipynb`](colab_gpu_benchmark.ipynb) | |
 
 ## 3. Time: is there anything to parallelise?
 
@@ -51,15 +53,20 @@ checkpointing (session 3, part B) would trade compute for memory we don't need.
 | Laptop CPU (M2, 4 threads) | **4.82 s** (runs: 4.85, 4.82, 4.59) | **1,624** | measured 25/11, `make train-benchmark`, Docker stopped |
 | Laptop CPU (AMD Ryzen 7 5800H, x86, 4 threads) | **1.84 s** (runs: 1.88, 1.84, 1.80) | **4,254** | measured 26/11, WSL2, idle kind cluster running ([`raw/training-x86.csv`](../benchmarks/raw/training-x86.csv), [environment](../benchmarks/x86/environment.md)) |
 | Laptop CPU (Ryzen 7 5800H, 8 threads = physical cores) | **1.49 s** (runs: 1.54, 1.49, 1.49) | **5,249** | same run |
-| Colab CPU | *pending* | *pending* | notebook |
-| Colab T4 GPU | *pending* | *pending* | notebook |
+| **Laptop GPU (NVIDIA RTX 3060 Laptop, 6 GB, CUDA 13.2)** | **0.46 s** (runs: 0.55, 0.46, 0.45) | **17,083** | measured 26/11, same x86 laptop, PyTorch 2.15 cu132 ([`raw/training-gpu.csv`](../benchmarks/raw/training-gpu.csv), [environment](../benchmarks/gpu/environment.md)) |
+| Colab T4 GPU | not run (local GPU measured instead) | | notebook kept |
 
 On the laptop CPU, a full v1 training run (early stopping at 25 epochs) is about 25 × 4.8 s ≈ **2 min** of
 training steps (*calculated* from the measured epoch time, plus a validation pass per epoch). It is already short
 enough to retrain at every merge. On the x86 laptop that became the prod machine, the full retraining (split,
 21 epochs with early stopping, evaluation gate) took **49 s wall-clock** (measured 26/11, one run). Going from 4 to 8
 CPU threads only gains 1.2× (1.84 → 1.49 s/epoch): the workload is already too small to use more parallelism, the
-same reason that makes multi-GPU pointless here. Data preparation (read the train split, fit the scaler, cut 7,833 windows) takes
+same reason that makes multi-GPU pointless here.
+
+**One GPU** (RTX 3060, measured 26/11): **0.46 s per epoch, 3.2× faster** than the best CPU setting (8 threads,
+1.49 s) and 4.0× faster than 4 threads. The GPU uses **27 MB** of its 6 GB. So a single GPU does help, but only
+turns ~1 min of training into ~15 s (*calculated*: 21 epochs × 0.46 s + validation): useful for phase B, not
+needed for v1. The first run (0.55 s) is slower because CUDA kernels are still being selected and cached. Data preparation (read the train split, fit the scaler, cut 7,833 windows) takes
 **0.33 s** (measured).
 
 **Communication** (*calculated* volume, order-of-magnitude latency): with DDP, every step all-reduces the
@@ -76,7 +83,7 @@ one GPU.
 |------------------------------|----------|--------|
 | Fits on one GPU, speed matters most | **yes**, by 4 orders of magnitude | one device; DDP only if a single device were too slow, and it is not |
 | Parameters do not fit on one GPU | no | FSDP and ZeRO-3 would shard parameters, but there is nothing to shard |
-| Only one Colab GPU | yes | we measure single-GPU time and memory directly; multi-GPU numbers stay calculated |
+| Only one GPU available (laptop RTX 3060, or Colab) | yes | single-GPU time and memory **measured** on the RTX 3060; multi-GPU numbers stay calculated |
 
 **When the decision would change:**
 - **Phase B (semi-supervised pre-training on SRV3490):** about 17× more windows (~127k, 0.8 GB) for the same
@@ -91,6 +98,9 @@ one GPU.
 
 ```bash
 make train-benchmark                  # laptop CPU: 3 epochs x 3 repeats -> benchmarks/raw/training.csv
-make colab-bundle                     # data + model for Colab (private)
+# laptop GPU: same script with a CUDA build of torch (outside the CPU-only project env)
+PYTHONPATH=src python -m ride_classifier.train_benchmark --device cuda --threads 4 \
+  --experiment training-gpu --out ai-infrastructure/benchmarks/raw/training-gpu.csv
+make colab-bundle                     # alternative: data + model for Colab (private)
 # then run colab_gpu_benchmark.ipynb on a T4 runtime and unzip colab_results.zip into ai-infrastructure/benchmarks/
 ```
