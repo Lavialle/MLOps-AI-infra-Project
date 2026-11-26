@@ -28,7 +28,7 @@ env:
 
 jobs:
   train:
-    runs-on: [self-hosted, macOS]
+    runs-on: [self-hosted, ride-classifier] # any machine hosting the kind cluster (custom runner label)
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
