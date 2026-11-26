@@ -131,3 +131,41 @@ mlflow 59 MB, against **onnxruntime 81 MB**. An ONNX-only API image could drop a
 
 Not done yet: building and measuring an ONNX-only API image, and serving it through the API and Kubernetes. That
 is the follow-up if the team adopts the decision.
+
+## Follow-up: PyTorch threads vs the 1-CPU limit of a pod
+
+**Hypothesis.** The API does not set a thread count, so PyTorch starts one intra-op thread per physical core of the
+node (**8** on the Ryzen 7 5800H) inside a pod limited to **1 CPU** (`cpu.max = 100000 100000`). Eight threads on a
+one-CPU quota should get the pod throttled by the kernel (CFS) and lengthen the tail latency.
+Fix tested: `OMP_NUM_THREADS=1`.
+
+**Protocol** (*measured* 26/11 on the kind prod, x86 laptop; [`threads_test.sh`](threads_test.sh), raw data in
+[`raw/threads-*`](raw/), medians in [`threads-results.csv`](threads-results.csv)): HPA pinned to 2 replicas, only the
+environment variable changes; 20-second warm-up, then Locust 20 users for 2 minutes on `/predict` with real test
+rides, 2 runs per configuration; CFS counters (`cpu.stat`) of both pods read before and after each run.
+
+| `/predict`, 20 users | Default (8 threads) | `OMP_NUM_THREADS=1` |
+|----------------------|---------------------|---------------------|
+| Requests / failures | 1,999 + 1,984 / 0 | 1,991 + 1,998 / 0 |
+| Throughput | 16.9 req/s | 16.9 req/s |
+| p50 | 77 · 79 ms | 69 · 77 ms |
+| **p95** | **390 · 380 ms** | **340 · 410 ms** |
+| p99 | 570 · 550 ms | 500 · 580 ms |
+| CFS periods throttled | 20.3 · 21.0 % | 14.4 · 17.3 % |
+| **Time throttled (2 pods, 2 min)** | **26.5 · 28.1 s** | **12.5 · 17.6 s** |
+
+*Values per run (run 1 · run 2).*
+
+**What it shows:**
+- **Throttling is real and the fix reduces it:** time throttled drops by about **45 %** (median 27 s → 15 s).
+- **No measurable latency gain at this load.** The p95 difference (385 → 375 ms, medians) is smaller than the gap
+  between two runs of the same configuration (340 vs 410 ms). The hypothesis that thread oversubscription explains
+  the 1.7 s p95 of the autoscaling test is **not supported**: that test was limited by the machine itself.
+- **Throughput is set by the load, not by the pods:** 20 Locust users with 0.5–1.5 s pauses offer ~17 req/s, which
+  both configurations serve. A saturation test (more users) would be needed to compare capacity.
+- **Why some throttling remains with 1 thread:** FastAPI runs concurrent requests in a thread pool, and JSON parsing,
+  Pydantic validation and pandas also use CPU, so bursts still exceed one CPU.
+
+**Decision:** setting `OMP_NUM_THREADS` to the pod's CPU limit is the standard practice and halves the throttling
+with no regression, but its latency benefit is within the noise here. It is a low-risk change, not a measured win.
+It is applied in [`k8s/api.yaml`](../../k8s/api.yaml) (`OMP_NUM_THREADS=1`, equal to `limits.cpu`).
