@@ -49,12 +49,17 @@ checkpointing (session 3, part B) would trade compute for memory we don't need.
 | Device | Seconds per epoch (median of 3) | Windows / s | Source |
 |--------|---------------------------------|-------------|--------|
 | Laptop CPU (M2, 4 threads) | **4.82 s** (runs: 4.85, 4.82, 4.59) | **1,624** | measured 25/11, `make train-benchmark`, Docker stopped |
+| Laptop CPU (AMD Ryzen 7 5800H, x86, 4 threads) | **1.84 s** (runs: 1.88, 1.84, 1.80) | **4,254** | measured 26/11, WSL2, idle kind cluster running ([`raw/training-x86.csv`](../benchmarks/raw/training-x86.csv), [environment](../benchmarks/x86/environment.md)) |
+| Laptop CPU (Ryzen 7 5800H, 8 threads = physical cores) | **1.49 s** (runs: 1.54, 1.49, 1.49) | **5,249** | same run |
 | Colab CPU | *pending* | *pending* | notebook |
 | Colab T4 GPU | *pending* | *pending* | notebook |
 
 On the laptop CPU, a full v1 training run (early stopping at 25 epochs) is about 25 × 4.8 s ≈ **2 min** of
 training steps (*calculated* from the measured epoch time, plus a validation pass per epoch). It is already short
-enough to retrain at every merge. Data preparation (read the train split, fit the scaler, cut 7,833 windows) takes
+enough to retrain at every merge. On the x86 laptop that became the prod machine, the full retraining (split,
+21 epochs with early stopping, evaluation gate) took **49 s wall-clock** (measured 26/11, one run). Going from 4 to 8
+CPU threads only gains 1.2× (1.84 → 1.49 s/epoch): the workload is already too small to use more parallelism, the
+same reason that makes multi-GPU pointless here. Data preparation (read the train split, fit the scaler, cut 7,833 windows) takes
 **0.33 s** (measured).
 
 **Communication** (*calculated* volume, order-of-magnitude latency): with DDP, every step all-reduces the

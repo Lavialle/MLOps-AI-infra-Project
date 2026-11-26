@@ -16,8 +16,8 @@ distributed-training decision, and a scalable, cost-aware serving design.
 | 1. Inventory and current architecture | [`architecture/current-system.md`](architecture/current-system.md) | Aymeric Mouttapa | done |
 | 2. Baseline benchmark (inference) | [`benchmarks/README.md`](benchmarks/README.md) | Nicolas Gilhodes | done |
 | 3. Optimization (ONNX Runtime) | [`optimization/README.md`](optimization/README.md) | Ange Lavialle | done: 4.5–10.6× faster, −51 % memory, identical predictions |
-| 4. Training sizing and distributed-training decision | `distributed-training/` | Leon Pejic | to do |
-| 5. Scaling, cost and resilience | `cost-resilience/` | Aymeric Mouttapa, Nicolas Gilhodes | to do |
+| 4. Training sizing and distributed-training decision | [`distributed-training/`](distributed-training/technical-analysis.md) | Leon Pejic | done: single device (CPU measured on M2 and x86); Colab GPU run pending |
+| 5. Scaling, cost and resilience | [`cost-resilience/`](cost-resilience/infrastructure-plan.md) | Aymeric Mouttapa, Nicolas Gilhodes | done: HPA 2 → 6 pods and rollback with 0 failed requests measured on kind; costs estimated |
 
 Each part is developed on its own branch and merged through a reviewed pull request.
 
