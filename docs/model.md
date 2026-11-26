@@ -67,3 +67,42 @@ On the frozen **test** split (75 rides), the gate passes only if both hold:
 
 Otherwise the script exits with code 1, which stops the CI pipeline. Val and test hold a single Reckless ride each,
 so per-class metrics for Reckless are very noisy. Macro F1 and the confusion matrix are the numbers to read.
+
+## Cross-validation: how noisy is the gate?
+
+`make cv` (or `python -m ride_classifier.cross_validate --device cuda`) runs a **5-fold cross-validation stratified
+by ride** with the same `params.yaml`: each ride is tested exactly once, by a model that never saw it, so all 6
+Reckless rides are tested instead of 1. In each fold, 15 % of all rides is held out from the training folds for early
+stopping. It is a measurement only: no MLflow run, no promotion, the frozen split and the gate are unchanged.
+Output: [`reports/cv.json`](../reports/cv.json).
+
+Measured 26/11 on the laptop GPU (RTX 3060, 59 s for the 5 folds):
+
+| Fold | Test rides (Reckless) | Macro F1 | Balanced accuracy | Best epoch |
+|------|-----------------------|----------|-------------------|------------|
+| 1 | 100 (1) | 0.343 | 0.599 | 12 |
+| 2 | 100 (2) | 0.274 | 0.405 | 5 |
+| 3 | 100 (1) | 0.237 | 0.258 | 1 |
+| 4 | 100 (1) | 0.324 | 0.504 | 28 |
+| 5 | 100 (1) | 0.437 | 0.459 | 4 |
+| **Mean ± std** | 500 (6) | **0.323 ± 0.076** | **0.445 ± 0.126** | |
+| Majority baseline | | 0.182 | 0.200 | |
+
+Pooled over the 500 rides (each predicted once):
+
+| | Safe | Safe overall | Bad weather | Tandem | Reckless |
+|-|------|--------------|-------------|--------|----------|
+| Recall | 0.654 | 0.211 | 0.455 | 0.278 | **0.500** (3 / 6) |
+
+What it shows:
+- **The model beats the baseline in every fold** (0.24–0.44 against 0.18): the signal is real.
+- **The gate floor (0.30) sits inside the noise**: it passes on 3 folds out of 5. The same training recipe can pass
+  or fail depending on which rides land in the test split. The floor should be set from the cross-validated
+  mean and standard deviation, not from one 75-ride split.
+- **Reckless recall is 0.5, not 1.** The single test ride of the frozen split was one of the easy ones.
+- **Class weighting buys recall on rare classes with false alarms:** 144 Safe rides out of 416 are predicted as
+  another class, and 21 of the 24 rides predicted Reckless are not Reckless (precision 0.125).
+- **Early stopping is noisy too:** the best epoch ranges from 1 to 28, because the validation part holds about one
+  Reckless ride per fold.
+
+GPU and CPU runs do not give bit-identical scores (different floating-point kernels), as between ARM and x86.

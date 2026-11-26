@@ -123,13 +123,18 @@ After the first deployment, **GitHub Actions** handles everything:
 | Majority baseline | 0.181 | 0.200 | 0.827 |
 
 Latest prod run (x86 laptop, [`reports/`](reports/)): this model is served in prod and baked into the Docker Hub
-images since the CD run of 26/11 (tag `6439b08` and `latest`). The fixed reference of
+images since the CD runs of 26/11 (`latest`). The fixed reference of
 [`ai-infrastructure/`](ai-infrastructure/) is the first v1, trained on an Apple M2: test macro F1 **0.317**,
 balanced accuracy 0.458 (validation 0.567, best epoch 17).
 
 The model clearly beats the baseline on the imbalance-aware metrics (macro F1, balanced accuracy). The baseline's
 accuracy only reflects the 83 % share of Safe rides. Val and test hold a single Reckless ride each, so per-class
-scores are noisy. Cross-validation or data augmentation would be the next modelling step.
+scores are noisy.
+
+**5-fold cross-validation by ride** (`make cv`, all 500 rides tested once, [details](docs/model.md#cross-validation-how-noisy-is-the-gate)):
+macro F1 **0.323 ± 0.076** (baseline 0.182), balanced accuracy 0.445 ± 0.126, Reckless recall 3/6. The model beats the
+baseline in every fold, but the gate floor of 0.30 passes on only 3 folds out of 5: it sits inside the noise of a
+75-ride test split. Next steps: set the gate from the cross-validated scores, then data augmentation.
 
 **Serving** (one process, laptop): `/predict` handles 16.5 rides/s with a P95 of 340 ms and 0 failures in a
 1-minute Locust test (20 users). The whole test split (75 rides) goes through `/predict/file` in 1.1 s.

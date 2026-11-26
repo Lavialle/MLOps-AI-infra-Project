@@ -43,6 +43,9 @@ evaluate: ## Gate macro F1 on the test split, promote to @staging if OK
 pipeline: ## Pipeline DVC (split -> train -> evaluate)
 	uv run dvc repro
 
+cv: ## 5-fold cross-validation by ride (measurement only, no promotion) -> reports/cv.json
+	uv run python -m ride_classifier.cross_validate
+
 dag: ## Prints the pipeline DAG (dvc.yaml)
 	uv run dvc dag
 
