@@ -1,14 +1,14 @@
 {
-  "run_id": "923d993df5e84ee590ed389039581e11",
+  "run_id": "1d4d3df838104bb4a311308c8d31008d",
   "model_name": "ride-classifier",
   "model_version": "1",
-  "val_macro_f1": 0.5669841269841269,
-  "val_balanced_accuracy": 0.5645161290322581,
-  "val_accuracy": 0.7466666666666667,
-  "val_recall_safe": 0.8225806451612904,
+  "val_macro_f1": 0.6040955004591367,
+  "val_balanced_accuracy": 0.6376344086021505,
+  "val_accuracy": 0.7866666666666666,
+  "val_recall_safe": 0.8548387096774194,
   "val_recall_safe_overall": 0.3333333333333333,
   "val_recall_bad_weather": 0.3333333333333333,
-  "val_recall_tandem": 0.3333333333333333,
+  "val_recall_tandem": 0.6666666666666666,
   "val_recall_reckless": 1.0,
   "val_baseline_macro_f1": 0.181021897810219,
   "val_baseline_balanced_accuracy": 0.2,
@@ -18,5 +18,5 @@
   "val_baseline_recall_bad_weather": 0.0,
   "val_baseline_recall_tandem": 0.0,
   "val_baseline_recall_reckless": 0.0,
-  "best_epoch": 17
+  "best_epoch": 13
 }

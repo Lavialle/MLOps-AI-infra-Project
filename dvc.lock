@@ -34,8 +34,8 @@ stages:
       size: 5317271
     - path: data/processed/train.parquet
       hash: md5
-      md5: 90814d177204906f5e52bc233a3c0c24
-      size: 21359222
+      md5: 1bda41dc682bc044f3efe0e17735db3a
+      size: 21346533
     - path: data/processed/val.parquet
       hash: md5
       md5: d29fb4062189e279a4cbfb36bc9f1d9a
@@ -45,8 +45,8 @@ stages:
     deps:
     - path: data/processed/train.parquet
       hash: md5
-      md5: 90814d177204906f5e52bc233a3c0c24
-      size: 21359222
+      md5: 1bda41dc682bc044f3efe0e17735db3a
+      size: 21346533
     - path: data/processed/val.parquet
       hash: md5
       md5: d29fb4062189e279a4cbfb36bc9f1d9a
@@ -80,7 +80,7 @@ stages:
     outs:
     - path: reports/train.json
       hash: md5
-      md5: 604eb2515e13c589ef14cb95349bbe79
+      md5: b7aaa8195ee0fd7a0a80f274b87d918c
       size: 793
   evaluate:
     cmd: python -m ride_classifier.evaluate
@@ -91,7 +91,7 @@ stages:
       size: 5317271
     - path: reports/train.json
       hash: md5
-      md5: 604eb2515e13c589ef14cb95349bbe79
+      md5: b7aaa8195ee0fd7a0a80f274b87d918c
       size: 793
     - path: src/ride_classifier/evaluate.py
       hash: md5
@@ -104,5 +104,5 @@ stages:
     outs:
     - path: reports/eval.json
       hash: md5
-      md5: a65cedeed3bedcab4c7b88e4856f1b18
-      size: 773
+      md5: 2da3c395aefce324cfe4c7e67ed5feeb
+      size: 758
