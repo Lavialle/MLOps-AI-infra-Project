@@ -57,12 +57,12 @@ stages:
       size: 3410
     - path: src/ride_classifier/model.py
       hash: md5
-      md5: 509b6d8ebfa1f8af40012ae5c45148e0
-      size: 5869
+      md5: 704ce15328390455a02a570391cf0d11
+      size: 5951
     - path: src/ride_classifier/train.py
       hash: md5
-      md5: 360e5c174c066f0318979b61b4a98cc9
-      size: 6613
+      md5: c267884166421f2650203afb812480a6
+      size: 6721
     params:
       params.yaml:
         features:
@@ -89,20 +89,86 @@ stages:
       hash: md5
       md5: 9281f19ed13aa17fca937e51f8f3b1c4
       size: 5317271
+    - path: reports/cv.json
+      hash: md5
+      md5: 70d3bbd431b6c8a4dcde21d3d5cd7628
+      size: 5738
     - path: reports/train.json
       hash: md5
       md5: b7aaa8195ee0fd7a0a80f274b87d918c
       size: 793
     - path: src/ride_classifier/evaluate.py
       hash: md5
-      md5: 5ea8f5d58659ae3a1c27aa43c0d9ed78
-      size: 2835
+      md5: f640c2e030ff761ed4ba05503da76aaa
+      size: 3871
     params:
       params.yaml:
         gate:
-          min_macro_f1: 0.3
+          cv_folds: 5
+          min_cv_macro_f1: 0.25
     outs:
     - path: reports/eval.json
       hash: md5
-      md5: 2da3c395aefce324cfe4c7e67ed5feeb
-      size: 758
+      md5: 4d41f264e8562f39c941b3f90f4f4f8c
+      size: 902
+  cv:
+    cmd: python -m ride_classifier.cross_validate
+    deps:
+    - path: data/raw/GBG500.parquet
+      hash: md5
+      md5: f7eb702062e890c9f3c533e5eaa683b7
+      size: 30206760
+    - path: data/raw/GBG500_labels.csv
+      hash: md5
+      md5: 843abe6d85802a850c945519678d2232
+      size: 35532
+    - path: src/ride_classifier/cross_validate.py
+      hash: md5
+      md5: 1e18acee6c7e4e3df9ad1aa540420efa
+      size: 5667
+    - path: src/ride_classifier/data.py
+      hash: md5
+      md5: b4046edc74c3ac8b1180c442459acf01
+      size: 5028
+    - path: src/ride_classifier/features.py
+      hash: md5
+      md5: 2297126a8f3571bcc45f16ce583312c5
+      size: 3410
+    - path: src/ride_classifier/model.py
+      hash: md5
+      md5: 704ce15328390455a02a570391cf0d11
+      size: 5951
+    - path: src/ride_classifier/train.py
+      hash: md5
+      md5: c267884166421f2650203afb812480a6
+      size: 6721
+    params:
+      params.yaml:
+        data:
+          raw_rides_path: data/raw/GBG500.parquet
+          raw_labels_path: data/raw/GBG500_labels.csv
+          max_missing_share: 0.05
+          test_share: 0.15
+          val_share: 0.15
+          random_state: 42
+          train_path: data/processed/train.parquet
+          val_path: data/processed/val.parquet
+          test_path: data/processed/test.parquet
+        features:
+          window_size: 256
+          window_stride: 128
+        gate.cv_folds: 5
+        train:
+          model: cnn1d
+          epochs: 30
+          batch_size: 64
+          learning_rate: 0.001
+          dropout: 0.3
+          class_weighting: balanced
+          patience: 8
+          random_state: 42
+    outs:
+    - path: reports/cv.json
+      hash: md5
+      md5: 70d3bbd431b6c8a4dcde21d3d5cd7628
+      size: 5738

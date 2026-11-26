@@ -68,7 +68,7 @@ def class_weights(y: np.ndarray, mode: str) -> torch.Tensor:
 
 
 def fit(
-    train: pd.DataFrame, val: pd.DataFrame, p_feat: dict, p_train: dict, on_epoch=None
+    train: pd.DataFrame, val: pd.DataFrame, p_feat: dict, p_train: dict, on_epoch=None, device: str = "cpu"
 ) -> tuple[RideClassifier, dict]:
     """Train on `train`, early-stop on ride-level macro F1 of `val`. Returns the wrapper (net loaded) and best scores.
 
@@ -81,8 +81,8 @@ def fit(
     X_tr, y_tr, _ = make_windows(train, scaler, ws, stride)
     X_val, _, val_ids = make_windows(val, scaler, ws, stride)
 
-    net = build_net(p_train["dropout"])
-    loss_fn = nn.CrossEntropyLoss(weight=class_weights(y_tr, p_train["class_weighting"]))
+    net = build_net(p_train["dropout"]).to(device)
+    loss_fn = nn.CrossEntropyLoss(weight=class_weights(y_tr, p_train["class_weighting"]).to(device))
     optimizer = torch.optim.Adam(net.parameters(), lr=p_train["learning_rate"])
     loader = DataLoader(
         TensorDataset(torch.from_numpy(X_tr), torch.from_numpy(y_tr).long()),
@@ -98,7 +98,7 @@ def fit(
         total = 0.0
         for xb, yb in loader:
             optimizer.zero_grad()
-            loss = loss_fn(net(xb), yb)
+            loss = loss_fn(net(xb.to(device)), yb.to(device))
             loss.backward()
             optimizer.step()
             total += loss.item() * len(xb)
@@ -118,7 +118,7 @@ def fit(
 
     net.load_state_dict(best_state)
     model = RideClassifier(scaler.to_dict(), ws, stride, p_train["dropout"])
-    model.net = net.eval()
+    model.net = net.cpu().eval()  # the served artifact is always CPU
     return model, best
 
 

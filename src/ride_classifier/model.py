@@ -63,7 +63,11 @@ def build_net(dropout: float = 0.3) -> nn.Module:
 def predict_windows(net: nn.Module, X: np.ndarray, batch_size: int = 512) -> np.ndarray:
     """Softmax probabilities (n_windows, 5)."""
     net.eval()
-    out = [torch.softmax(net(torch.from_numpy(X[i : i + batch_size])), dim=1) for i in range(0, len(X), batch_size)]
+    device = next(net.parameters()).device
+    out = [
+        torch.softmax(net(torch.from_numpy(X[i : i + batch_size]).to(device)), dim=1).cpu()
+        for i in range(0, len(X), batch_size)
+    ]
     return torch.cat(out).numpy()
 
 

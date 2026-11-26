@@ -33,11 +33,31 @@ stages:
       - reports/train.json:
           cache: false
 
+  cv:
+    cmd: python -m ride_classifier.cross_validate
+    deps:
+      - src/ride_classifier/cross_validate.py
+      - src/ride_classifier/train.py
+      - src/ride_classifier/model.py
+      - src/ride_classifier/features.py
+      - src/ride_classifier/data.py
+      - data/raw/GBG500.parquet
+      - data/raw/GBG500_labels.csv
+    params:
+      - data
+      - features
+      - train
+      - gate.cv_folds
+    metrics:
+      - reports/cv.json:
+          cache: false
+
   evaluate:
     cmd: python -m ride_classifier.evaluate
     deps:
       - src/ride_classifier/evaluate.py
       - reports/train.json
+      - reports/cv.json
       - data/processed/test.parquet
     params:
       - gate

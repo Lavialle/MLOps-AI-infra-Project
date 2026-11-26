@@ -60,7 +60,10 @@ jobs:
       - name: Training (logged to prod MLflow, new registered version)
         run: uv run --no-sync python -m ride_classifier.train
 
-      - name: Evaluation gate (macro F1 on the test split, promotes to @staging if passed)
+      - name: Cross-validation (5 folds by ride, reports/cv.json)
+        run: uv run --no-sync python -m ride_classifier.cross_validate
+
+      - name: Evaluation gate (cross-validated macro F1 + test split, promotes to @staging if passed)
         run: uv run --no-sync python -m ride_classifier.evaluate
 
       - name: Summary
