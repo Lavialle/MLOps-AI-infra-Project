@@ -118,9 +118,13 @@ After the first deployment, **GitHub Actions** handles everything:
 
 | Split (75 rides) | Macro F1 | Balanced accuracy | Accuracy |
 |------------------|----------|-------------------|----------|
-| Validation (best epoch 17) | **0.567** | 0.565 | 0.747 |
-| Test (evaluation gate) | **0.317** | 0.458 | 0.693 |
+| Validation (best epoch 13) | **0.604** | 0.638 | 0.787 |
+| Test (evaluation gate) | **0.329** | 0.331 | 0.733 |
 | Majority baseline | 0.181 | 0.200 | 0.827 |
+
+Latest prod run (x86 laptop, [`reports/`](reports/)). The model baked into the Docker Hub image and used as the fixed
+reference in [`ai-infrastructure/`](ai-infrastructure/) is the first v1, trained on an Apple M2: test macro F1
+**0.317**, balanced accuracy 0.458 (validation 0.567, best epoch 17).
 
 The model clearly beats the baseline on the imbalance-aware metrics (macro F1, balanced accuracy). The baseline's
 accuracy only reflects the 83 % share of Safe rides. Val and test hold a single Reckless ride each, so per-class
@@ -134,7 +138,7 @@ scores are noisy. Cross-validation or data augmentation would be the next modell
 | What | Result |
 |------|--------|
 | CD runs | Export from the prod registry, build, push, `kind load`, zero-downtime rolling update and 5/5 e2e tests on prod, in one workflow on the self-hosted runner |
-| Retraining | Deterministic: the same data and seed give the same scores in dev and prod |
+| Retraining | Deterministic on a given machine: the same data and seed give the same scores in dev and prod. Across CPU architectures (ARM vs x86) floating-point rounding differs, so scores move slightly (test macro F1 0.317 vs 0.329) |
 
 ### Screenshots
 
