@@ -14,7 +14,7 @@ Nothing here claims a real cloud deployment or real autoscaling unless it is mar
 
 | Concern | Current (laptop) | Proposed (GCP, one region) | Why |
 |---------|------------------|----------------------------|-----|
-| API serving | 2 pods on kind | **GKE Autopilot** Deployment, CPU only, **HPA** on CPU | Measured (step 2): the network is ~80–93 % of each request, but only ~15 ms per ride on one laptop CPU, so one CPU pod serves tens of rides/s. Whether a GPU pays off is measured on Colab (step 4) before deciding. CPU pods scale horizontally |
+| API serving | 2 pods on kind | **GKE Autopilot** Deployment, CPU only, **HPA** on CPU | Measured (step 2): the network is ~80–93 % of each request, but only ~15 ms per ride on one laptop CPU, so one CPU pod serves tens of rides/s. Step 4 measured a GPU for training only (3.2× faster per epoch); for serving, a GPU is not needed (see below). CPU pods scale horizontally |
 | Model runtime | PyTorch in a 2.5 GB image | PyTorch, or ONNX Runtime if step 3 confirms the gain | smaller image means faster scale-out and more pods per node |
 | Web app | kind pod | same cluster, 1 replica | low traffic, stateless |
 | Images | Docker Hub | Artifact Registry, same region | pull speed when scaling out |

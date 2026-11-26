@@ -25,7 +25,7 @@ This is the system **as implemented today** (model v1), not the proposed future 
 | Monitoring | 4-layer dashboard, 8 alerts with runbooks | Prometheus, Grafana | kind cluster on the laptop |
 
 **Where the model runs:** training and inference both run **on the CPU of one laptop**. No GPU is used, and Colab
-and GCP are not used by the current system. Colab is used only for the GPU measurements of step 4.
+and GCP are not used by the current system. A laptop GPU (RTX 3060) is used only for the GPU measurement of step 4.
 
 ## Resources
 
@@ -79,7 +79,7 @@ footprint comes from the runtime (PyTorch, MLflow, pandas), not from the model. 
     the 8 GB.
 
 This answer changes if the unlabelled dataset is used (phase B): 17× more training windows, 0.8 GB of data, and
-pre-training estimated at around 30–40 min on CPU. Step 4 measures that case on CPU and on a Colab GPU.
+pre-training estimated at around 30–40 min on CPU. Step 4 measures the per-epoch time on CPU and on one GPU.
 
 ## Gaps measured in the next steps
 

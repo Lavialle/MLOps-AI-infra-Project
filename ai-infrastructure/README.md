@@ -16,7 +16,7 @@ distributed-training decision, and a scalable, cost-aware serving design.
 | 1. Inventory and current architecture | [`architecture/current-system.md`](architecture/current-system.md) | Aymeric Mouttapa | done |
 | 2. Baseline benchmark (inference) | [`benchmarks/README.md`](benchmarks/README.md) | Nicolas Gilhodes | done |
 | 3. Optimization (ONNX Runtime) | [`optimization/README.md`](optimization/README.md) | Ange Lavialle | done: 4.5–10.6× faster, −51 % memory, identical predictions |
-| 4. Training sizing and distributed-training decision | [`distributed-training/`](distributed-training/technical-analysis.md) | Leon Pejic | done: single device (CPU measured on M2 and x86); Colab GPU run pending |
+| 4. Training sizing and distributed-training decision | [`distributed-training/`](distributed-training/technical-analysis.md) | Leon Pejic | done: single device; CPU (M2, x86) and one GPU (RTX 3060: 3.2× faster per epoch, 27 MB) measured |
 | 5. Scaling, cost and resilience | [`cost-resilience/`](cost-resilience/infrastructure-plan.md) | Aymeric Mouttapa, Nicolas Gilhodes | done: HPA 2 → 6 pods and rollback with 0 failed requests measured on kind; costs estimated |
 
 Each part is developed on its own branch and merged through a reviewed pull request.
@@ -30,8 +30,8 @@ Every comparison uses the same model version and the same test data. Both are pi
 |-|-----------|
 | Model | `ride-classifier` **v1** (PyTorch 1D-CNN, 37,477 parameters, `weights.pt` 159 KB), exported to `./model` by `make export` |
 | Test data | the frozen test split `data/processed/test.parquet`: 75 rides, 230,622 rows (`make pull pipeline`) |
-| CPU machine | MacBook Air, Apple M2 (8 cores), 8 GB RAM, macOS; PyTorch uses 4 threads by default |
-| GPU machine | Google Colab T4 (one GPU, when available) |
+| CPU machines | MacBook Air, Apple M2 (8 cores), 8 GB RAM, macOS (steps 2–4); laptop AMD Ryzen 7 5800H (8 cores / 16 threads), WSL2, the prod machine since 26/11 (steps 4–5) |
+| GPU machine | NVIDIA RTX 3060 Laptop GPU, 6 GB, on the Ryzen laptop (step 4). The Colab T4 notebook is kept but was not run |
 
 When the model changes (phase B: semi-supervised pre-training), all measurements are rerun with the new
 version and reported **next to** v1, never instead of it.
@@ -79,7 +79,7 @@ ai-infrastructure/
 ├── architecture/             current-system and proposed-system diagrams, component inventory
 ├── benchmarks/               environment record, benchmark procedure and results; raw/ = raw CSVs
 ├── optimization/             ONNX Runtime export, before/after comparison
-├── distributed-training/     training measurements (CPU, Colab GPU), DDP/FSDP/ZeRO analysis
+├── distributed-training/     training measurements (CPU, laptop GPU), DDP/FSDP/ZeRO analysis
 └── cost-resilience/          serving architecture, scaling test, cost estimates, rollback plan
 ```
 
