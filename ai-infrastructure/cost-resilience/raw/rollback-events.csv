@@ -1,0 +1,6 @@
+t_s,event
+10.004079961,broken revision applied (MODEL_URI points to a missing model)
+96.106107872,rollout not complete after 90 s timeout: broken deployment detected
+96.111193760,kubectl rollout undo
+96.390050660,previous revision fully rolled back
+104.961020792,end

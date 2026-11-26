@@ -43,8 +43,36 @@ costs are therefore set by the minimum always-on footprint, not by load, and aut
 above the expected traffic. A GPU for serving is not justified: one CPU replica already has an order of
 magnitude of headroom.
 
-**Autoscaling test in kind** (*pending*): install metrics-server, add the HPA, ramp up Locust, and record the
-replica count and p95 over time. Until that run exists, autoscaling is a design, not a result.
+**Autoscaling test in kind** (*measured* 26/11, x86 laptop: Ryzen 7 5800H, 16 logical CPUs, one kind node;
+[`hpa_test.sh`](hpa_test.sh), [`hpa.yaml`](hpa.yaml), raw data in [`raw/hpa-*.csv`](raw/)). metrics-server, HPA on
+CPU at 60 % of the 250m request, min 2 / max 6 replicas, scale-down window 60 s. Locust ramps to 60 users
+(1 user/s), 6 minutes, real test rides on `/predict`; Locust runs on the same laptop.
+
+| t (s) | Load | HPA CPU (% of request) | Replicas desired → ready |
+|-------|------|------------------------|--------------------------|
+| 0–39 | none | 1 % | 2 |
+| 58 | ramping | 96 % | **4** wanted |
+| 78 | ramping | 262 % | 4 ready, **6** wanted |
+| 87 | 60 users | 370 % | **6 ready** (max) |
+| 116–398 | 60 users | 173–201 % | 6 (capped by `maxReplicas`) |
+| 446 | stopped | 1 % | **2** wanted (after the 60 s window) |
+| 465 | none | 1 % | 2 ready |
+
+| Locust (6 min, 60 users) | Value |
+|--------------------------|-------|
+| Requests | 11,821 (11,235 `/predict`), **0 failures** |
+| Throughput | 34.7 req/s overall, ~38 req/s at full load |
+| `/predict` latency | p50 520 ms, **p95 1.7 s**, max 2.3 s |
+
+What it shows:
+- **The HPA works**: 2 → 6 replicas within ~40 s of the CPU crossing the target, back to 2 one minute after the
+  load stops, with no failed request while pods were added or removed.
+- **It hit `maxReplicas`**: with 6 pods the CPU still sat at ~190 % of the request (≈ 475m per pod), above the
+  60 % target. The HPA wanted more pods than allowed.
+- **More pods on one machine do not add CPU.** The 6 pods, the rest of the stack and Locust share the same 16
+  logical CPUs, so p95 grew from 340 ms (one replica, 20 users, 22/11) to 1.7 s at 60 users. Scaling pods out
+  only helps if the cluster also adds **nodes**: that is why the proposed design uses GKE Autopilot, where
+  capacity follows the pods. On a single laptop, the honest limit is the laptop.
 
 ## 3. Costs (estimated, to be checked)
 
@@ -103,12 +131,29 @@ What already exists, and what we test:
 
 | Failure | Mechanism | Status |
 |---------|-----------|--------|
-| A new image breaks the API | CD runs e2e tests on prod after the rolling update; on failure, `kubectl rollout undo` | implemented. **Deliberate failing deploy: pending** (records the time back to a healthy state) |
+| A new image breaks the API | CD runs e2e tests on prod after the rolling update; on failure, `kubectl rollout undo` | implemented, **measured** (see below) |
 | A pod without a model | readiness `/ready` = 503, so it gets no traffic; liveness `/health` does not restart it in a loop | implemented, tested (unit + e2e) |
 | A pod crashes or is OOMKilled | Deployment recreates it; 2 replicas, rolling updates with `maxUnavailable: 0` | implemented |
 | A worse model | evaluation gate on the test split (macro F1 ≥ floor and > baseline) before `@staging`; previous image tag on Docker Hub | implemented, tested (gate) |
 | Silent input drift (e.g. unit bug) | `InputGravityShift` alert + runbook | **measured**: fired after ~12 min of simulated unit-bug traffic (22/11) |
 | Laptop down | everything stops: a single point of failure | accepted for the course; removed in the proposed design |
+
+**Deliberate failing deployment** (*measured* 26/11 on the kind prod, x86 laptop,
+[`rollback_test.sh`](rollback_test.sh), raw data in [`raw/rollback-*.csv`](raw/)): a new revision whose pods point
+to a missing model (`MODEL_URI=/app/missing-model`), so they never pass the `/ready` probe. A probe sent a real
+ride to `/predict` every second during the whole test.
+
+| What | Result |
+|------|--------|
+| Requests to `/predict` during the test | **104 / 104 returned 200**: no downtime |
+| Detection | rollout not complete after the **90 s** timeout (same rule as CD) |
+| `kubectl rollout undo` → previous revision complete | **0.28 s** |
+| State after | the same 2 original pods, never restarted |
+
+Why so fast and without errors: with `maxUnavailable: 0` the old pods are never removed before a new pod is
+Ready, and the broken pod never becomes Ready, so it receives no traffic. The undo only deletes it. The cost of a
+bad image is therefore the **detection time**, not an outage. A model that loads but predicts badly is not caught
+by this mechanism: that is the job of the evaluation gate and of the monitoring alerts.
 
 **Rollback procedure** (manual, when CD did not catch the problem):
 1. `kubectl -n ride-classifier rollout undo deploy/ride-classifier-api`, or redeploy a known tag with

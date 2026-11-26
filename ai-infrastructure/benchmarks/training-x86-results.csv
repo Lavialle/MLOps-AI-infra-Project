@@ -1,0 +1,13 @@
+experiment,runtime,device,threads,batch_rides,metric,median,runs
+training-x86,pytorch,cpu,4,64,data_prep_s,1.9800193249993754,1
+training-x86,pytorch,cpu,4,64,final_loss,0.8153169751167297,3
+training-x86,pytorch,cpu,4,64,peak_rss_mb,958.55078125,3
+training-x86,pytorch,cpu,4,64,s_per_epoch,1.8414391713331497,3
+training-x86,pytorch,cpu,4,64,windows,7833.0,1
+training-x86,pytorch,cpu,4,64,windows_per_s,4253.738120672827,3
+training-x86,pytorch,cpu,8,64,data_prep_s,1.2704218920007406,1
+training-x86,pytorch,cpu,8,64,final_loss,0.8282060027122498,3
+training-x86,pytorch,cpu,8,64,peak_rss_mb,1033.73828125,3
+training-x86,pytorch,cpu,8,64,s_per_epoch,1.4922895859999699,3
+training-x86,pytorch,cpu,8,64,windows,7833.0,1
+training-x86,pytorch,cpu,8,64,windows_per_s,5248.981212149368,3

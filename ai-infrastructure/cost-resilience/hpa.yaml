@@ -1,0 +1,24 @@
+# HorizontalPodAutoscaler for the API (step 5 autoscaling test). Not part of k8s/ (prod): applied by hpa_test.sh.
+# Needs metrics-server. Target 60 % of the CPU *request* (250m), the utilisation chosen in infrastructure-plan.md.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ride-classifier-api
+  namespace: ride-classifier
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ride-classifier-api
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60 # default 300 s: shortened so the test also shows the scale-down
